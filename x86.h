@@ -16,17 +16,16 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef __PX86_H__
+#define __PX86_H__
 
-#ifndef __WIN_FCT_H__
-#define __WIN_FCT_H__
+#include "precomp.h"
 
-#include "sig.hpp"
-#include "hash.hpp"
-
-clist_t * clist_init(slist_t *);
-int clist_insert(clist_t *, psig_t *);
-clist_t * clist_init_from_refs(hpsig_t *, frefs_t *);
-void clist_remove(clist_t *, dpsig_t *);
-void clist_reset(clist_t *);
+unsigned char x86_get_byte(ea_t);
+bool x86_remove_instr(unsigned char, ea_t);
+bool x86_is_end_block(ea_t);
+bool x86_is_direct_jump(ea_t ea);
+ea_t x86_get_fake_jump(ea_t);
+int x86_is_cond_jump_pos(ea_t);
 
 #endif

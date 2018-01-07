@@ -17,42 +17,16 @@
 */
 
 
-#ifndef __DIFF_H__
-#define __DIFF_H__
+#ifndef __BACKUP_H__
+#define __BACKUP_H__
 
-#include "sig.hpp"
-#include "hash.hpp"
-#include "options.hpp"
+#include "sig.h"
 
+// 1: first format
+// 2: adds str hash
+#define PDIFF_BACKUP_VERSION 3
 
-#define DIFF_EQUAL_NAME					0
-#define DIFF_EQUAL_SIG_HASH_CRC			1
-#define DIFF_EQUAL_SIG_HASH_CRC_STR		2
-#define DIFF_EQUAL_SIG_HASH				3
-#define DIFF_NEQUAL_PRED				4
-#define DIFF_NEQUAL_SUCC				5
-#define DIFF_NEQUAL_STR					6
-#define DIFF_MANUAL						7
-
-
-struct dengine
-{
-	int magic;
-	int matched;
-	int unmatched;
-	int identical;
-	slist_t * mlist;
-	slist_t * ulist;
-	slist_t * ilist;
-	options_t * opt;
-	int wnum;
-};
-
-typedef struct dengine deng_t;
-
-
-int generate_diff(deng_t **, slist_t *, slist_t *, char *, bool, options_t *);
-void diff_engine_free(deng_t *);
-bool sig_equal(psig_t *, psig_t *, int);
+void backup_save_results(deng_t *);
+int backup_load_results(deng_t **, options_t *);
 
 #endif

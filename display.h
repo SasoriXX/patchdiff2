@@ -19,7 +19,7 @@
 #ifndef __DISPLAY_H__
 #define __DISPLAY_H__
 
-#include "diff.hpp"
+#include "diff.h"
 
 
 // column widths
@@ -27,44 +27,40 @@ static const int widths_match[] = { 5, 32, 32, 16, 16, 4, 16, 16 };
 static const int widths_unmatch[] = { 5, 32, 16, 8, 8, 8};
 
 // column headers
-static const char *header_match[] =
-{
-	"Engine",
-	"Function 1",
-	"Function 2",
-	"Address 1",
-	"Address 2",
-	"CRC",
-	"CRC1",
-	"CRC2"
+static const char *header_match[] = {
+   "Engine",
+   "Function 1",
+   "Function 2",
+   "Address 1",
+   "Address 2",
+   "CRC",
+   "CRC1",
+   "CRC2"
 };
 
-static const char *header_unmatch[] =
-{
-	"File",
-	"Function name",
-	"Function address",
-	"Sig",
-	"Hash",
-	"CRC"
+static const char *header_unmatch[] = {
+   "File",
+   "Function name",
+   "Function address",
+   "Sig",
+   "Hash",
+   "CRC"
 };
 
 static const char * popup_null = "\0\0\0\0";
 
-static const char * popup_match[] =
-{
-	popup_null,
-	popup_null,
-	"Display Graphs",
-	NULL,
+static const char * popup_match[] = {
+   popup_null,
+   popup_null,
+   "Display Graphs",
+   NULL,
 };
 
-static const char * popup_unmatch[] =
-{
-	popup_null,
-	popup_null,
-	"Display Graph",
-	NULL,
+static const char * popup_unmatch[] = {
+   popup_null,
+   popup_null,
+   "Display Graph",
+   NULL,
 };
 
 
@@ -75,6 +71,10 @@ static const char* title_identical = "Identical Functions";
 
 void display_results(deng_t *);
 
-int idaapi ui_callback(void * data, int event_id, va_list va);
+#if IDA_SDK_VERSION < 700
+int idaapi ui_callback(void *data, int event_id, va_list va);
+#else
+ssize_t idaapi ui_callback(void *data, int event_id, va_list va);
+#endif
 
 #endif

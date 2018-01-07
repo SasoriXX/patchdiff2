@@ -17,19 +17,45 @@
 */
 
 
-#ifndef __PATCHDIFF_H__
-#define __PATCHDIFF_H__
+#ifndef __SYSTEM_HPP__
+#define __SYSTEM_HPP__
+
+#include "sig.h"
+#include "options.h"
+
+#define PATCHDIFF_IDC "#include <idc.idc>\n\nstatic main (void)\n{\n   RunPlugin (\"patchdiff2\", 1);\n   Exit(1);\n}\n"
+
+#define SPREF_INT 1
+
+#define IPC_DATA 0
+#define IPC_DONE 1
+#define IPC_END  3
+
+#define IPC_SERVER 1
+#define IPC_CLIENT 2
 
 
-enum pcpu_type
-{
-	CPU_DEFAULT,
-	CPU_X8632,
-	CPU_X8664,
-	CPU_PPC
+struct ipc_config {
+   long init;
+   void * data;
 };
 
-typedef enum pcpu_type cpu_t;
+typedef struct ipc_config ipc_config_t;
 
+struct idata {
+   long cmd;
+   char data[256];
+};
+
+typedef struct idata idata_t;
+
+
+bool system_get_pref(const char *, void *, int);
+slist_t * system_parse_idb(ea_t, char *, options_t *);
+
+bool ipc_init(char *, int, long);
+void ipc_close();
+bool ipc_recv_cmd(char *, size_t);
+bool ipc_recv_cmd_end();
 
 #endif

@@ -21,10 +21,9 @@
 #define __OPTIONS_H__
 
 
-struct p_options
-{
-	bool ipc;	// inter process communication
-	bool save_db;
+struct p_options {
+   bool ipc;   // inter process communication
+   bool save_db;
 };
 
 typedef struct p_options options_t;

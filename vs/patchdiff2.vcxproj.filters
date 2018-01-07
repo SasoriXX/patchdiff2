@@ -15,58 +15,58 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\backup.hpp">
+    <ClInclude Include="..\backup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\clist.hpp">
+    <ClInclude Include="..\clist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\diff.hpp">
+    <ClInclude Include="..\diff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\display.hpp">
+    <ClInclude Include="..\display.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\hash.hpp">
+    <ClInclude Include="..\hash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\options.hpp">
+    <ClInclude Include="..\options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\os.hpp">
+    <ClInclude Include="..\os.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\parser.hpp">
+    <ClInclude Include="..\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\patchdiff.hpp">
+    <ClInclude Include="..\patchdiff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\pchart.hpp">
+    <ClInclude Include="..\pchart.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\pgraph.hpp">
+    <ClInclude Include="..\pgraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\ppc.hpp">
+    <ClInclude Include="..\ppc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\sig.hpp">
+    <ClInclude Include="..\sig.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\system.hpp">
+    <ClInclude Include="..\system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\win_fct.hpp">
+    <ClInclude Include="..\win_fct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\x86.hpp">
+    <ClInclude Include="..\x86.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\unix_fct.hpp">
+    <ClInclude Include="..\unix_fct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\precomp.hpp">
+    <ClInclude Include="..\precomp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

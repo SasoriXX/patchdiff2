@@ -17,59 +17,56 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "diff.hpp"
-#include "display.hpp"
-#include "os.hpp"
-#include "parser.hpp"
-#include "pgraph.hpp"
-#include "options.hpp"
-#include "system.hpp"
+#include "diff.h"
+#include "display.h"
+#include "os.h"
+#include "parser.h"
+#include "pgraph.h"
+#include "options.h"
+#include "system.h"
 
+//global diff engine object
+static deng_t *eng;
 
-static uint32 idaapi sizer_dlist(slist_t *sl)
-{
-	if (sl)
-		return sl->num;
-
-	return 0;
+static uint32 idaapi sizer_dlist(slist_t *sl) {
+   if (sl) {
+      return sl->num;
+   }
+   return 0;
 }
 
 
-static uint32 idaapi sizer_match(void *obj)
-{
-	deng_t * d = (deng_t *)obj;
+static uint32 idaapi sizer_match(void *obj) {
+   deng_t *d = (deng_t *)obj;
 
-	return sizer_dlist(d ? d->mlist : NULL);
+   return sizer_dlist(d ? d->mlist : NULL);
 }
 
 
-static uint32 idaapi sizer_identical(void *obj)
-{
-	deng_t * d = (deng_t *)obj;
+static uint32 idaapi sizer_identical(void *obj) {
+   deng_t *d = (deng_t *)obj;
 
-	return sizer_dlist(d ? d->ilist : NULL);
+   return sizer_dlist(d ? d->ilist : NULL);
 }
 
 
-static uint32 idaapi sizer_unmatch(void *obj)
-{
-	deng_t * d = (deng_t *)obj;
+static uint32 idaapi sizer_unmatch(void *obj) {
+   deng_t *d = (deng_t *)obj;
 
-	return sizer_dlist(d ? d->ulist : NULL);
+   return sizer_dlist(d ? d->ulist : NULL);
 }
 
 
-static void idaapi close_window(void *obj)
-{
-	deng_t * d = (deng_t *)obj;
+static void idaapi close_window(void *obj) {
+   deng_t *d = (deng_t *)obj;
 
-	d->wnum--;
-	if (!d->wnum)
-		ipc_close();
-
-	return;
+   d->wnum--;
+   if (!d->wnum) {
+      ipc_close();
+   }
+   return;
 }
 
 
@@ -80,39 +77,37 @@ static void idaapi close_window(void *obj)
 /*         bounds checking in debug               */
 /*------------------------------------------------*/
 
-static psig_t *ui_access_sig(slist_t *sl, uint32 n)
-{
+static psig_t *ui_access_sig(slist_t *sl, uint32 n) {
 #ifdef _DEBUG
-	if (!sl || n == 0 || n > sl->num)
-		error("ui attempted to access siglist out-of-bounds: %p %x\n", sl, n - 1);
-	else
+   if (!sl || n == 0 || n > sl->num) {
+      error("ui attempted to access siglist out-of-bounds: %p %x\n", sl, n - 1);
+      return NULL;
+   }
 #endif
-		return sl->sigs[n - 1];
+   return sl->sigs[n - 1];
 }
 
+#if IDA_SDK_VERSION <= 695
+static void idaapi desc_dlist(slist_t *sl, uint32 n, char *const *arrptr) {
+   int i;
 
-static void idaapi desc_dlist(slist_t * sl,uint32 n,char * const *arrptr)
-{
-	int i;
-
-	/* header */
-	if (n == 0)
-	{
-		for (i = 0; i < qnumber (header_match); i++)
-			qsnprintf(arrptr[i], MAXSTR, "%s", header_match[i]);
-	}
-	else
-	{
-		psig_t *sig = ui_access_sig(sl, n);
-		qsnprintf(arrptr[0], MAXSTR, "%u", sig->mtype);
-		qsnprintf(arrptr[1], MAXSTR, "%s", sig->name);
-		qsnprintf(arrptr[2], MAXSTR, "%s", sig->msig->name);
-		qsnprintf(arrptr[3], MAXSTR, "%a", sig->startEA);
-		qsnprintf(arrptr[4], MAXSTR, "%a", sig->msig->startEA);
-		qsnprintf(arrptr[5], MAXSTR, "%c", sig->id_crc ? '+' : '-');
-		qsnprintf(arrptr[6], MAXSTR, "%lx", sig->crc_hash);
-		qsnprintf(arrptr[7], MAXSTR, "%lx", sig->msig->crc_hash);
-	}
+   /* header */
+   if (n == 0) {
+      for (i = 0; i < qnumber (header_match); i++) {
+         qsnprintf(arrptr[i], MAXSTR, "%s", header_match[i]);
+      }
+   }
+   else {
+      psig_t *sig = ui_access_sig(sl, n);
+      qsnprintf(arrptr[0], MAXSTR, "%u", sig->mtype);
+      qsnprintf(arrptr[1], MAXSTR, "%s", sig->name.c_str());
+      qsnprintf(arrptr[2], MAXSTR, "%s", sig->msig->name.c_str());
+      qsnprintf(arrptr[3], MAXSTR, "%a", sig->startEA);
+      qsnprintf(arrptr[4], MAXSTR, "%a", sig->msig->startEA);
+      qsnprintf(arrptr[5], MAXSTR, "%c", sig->id_crc ? '+' : '-');
+      qsnprintf(arrptr[6], MAXSTR, "%lx", sig->crc_hash);
+      qsnprintf(arrptr[7], MAXSTR, "%lx", sig->msig->crc_hash);
+   }
 }
 
 
@@ -121,11 +116,10 @@ static void idaapi desc_dlist(slist_t * sl,uint32 n,char * const *arrptr)
 /* description: Fills matched list                */
 /*------------------------------------------------*/
 
-static void idaapi desc_match(void *obj,uint32 n,char * const *arrptr)
-{
-	deng_t * d = (deng_t *)obj;
+static void idaapi desc_match(void *obj, uint32 n, char *const *arrptr) {
+   deng_t *d = (deng_t *)obj;
 
-	desc_dlist(d ? d->mlist : NULL, n, arrptr);
+   desc_dlist(d ? d->mlist : NULL, n, arrptr);
 }
 
 
@@ -134,11 +128,10 @@ static void idaapi desc_match(void *obj,uint32 n,char * const *arrptr)
 /* description: Fills identical list              */
 /*------------------------------------------------*/
 
-static void idaapi desc_identical(void *obj,uint32 n,char * const *arrptr)
-{
-	deng_t * d = (deng_t *)obj;
+static void idaapi desc_identical(void *obj, uint32 n, char *const *arrptr) {
+   deng_t *d = (deng_t *)obj;
 
-	desc_dlist(d ? d->ilist : NULL, n, arrptr);
+   desc_dlist(d ? d->ilist : NULL, n, arrptr);
 }
 
 
@@ -147,33 +140,30 @@ static void idaapi desc_identical(void *obj,uint32 n,char * const *arrptr)
 /* description: Fills unmatched list              */
 /*------------------------------------------------*/
 
-static void idaapi desc_unmatch(void *obj,uint32 n,char * const *arrptr)
-{
-	int i;
+static void idaapi desc_unmatch(void *obj, uint32 n, char *const *arrptr) {
+   int i;
 
-	/* header */
-	if (n == 0)
-	{
-		for (i = 0; i < qnumber (header_unmatch); i++)
-			qsnprintf(arrptr[i], MAXSTR, "%s", header_unmatch[i]);
-	}
-	else
-	{
-		psig_t *sig = ui_access_sig(((deng_t *)obj)->ulist, n);
-		qsnprintf(arrptr[0], MAXSTR, "%u", sig->nfile);
-		qsnprintf(arrptr[1], MAXSTR, "%s", sig->name);
-		qsnprintf(arrptr[2], MAXSTR, "%a", sig->startEA);
-		qsnprintf(arrptr[3], MAXSTR, "%.8lX", sig->sig);
-		qsnprintf(arrptr[4], MAXSTR, "%.8lX", sig->hash);
-		qsnprintf(arrptr[5], MAXSTR, "%.8lX", sig->crc_hash);
-	}
+   /* header */
+   if (n == 0) {
+      for (i = 0; i < qnumber (header_unmatch); i++) {
+         qsnprintf(arrptr[i], MAXSTR, "%s", header_unmatch[i]);
+      }
+   }
+   else {
+      psig_t *sig = ui_access_sig(((deng_t *)obj)->ulist, n);
+      qsnprintf(arrptr[0], MAXSTR, "%u", sig->nfile);
+      qsnprintf(arrptr[1], MAXSTR, "%s", sig->name.c_str());
+      qsnprintf(arrptr[2], MAXSTR, "%a", sig->startEA);
+      qsnprintf(arrptr[3], MAXSTR, "%.8lX", sig->sig);
+      qsnprintf(arrptr[4], MAXSTR, "%.8lX", sig->hash);
+      qsnprintf(arrptr[5], MAXSTR, "%.8lX", sig->crc_hash);
+   }
 }
+#endif
 
-
-static void idaapi enter_list(slist_t * sl,uint32 n)
-{
-	jumpto(ui_access_sig(sl, n)->startEA);
-	os_copy_to_clipboard(NULL);
+static void idaapi enter_list(slist_t *sl, uint32 n) {
+   jumpto(ui_access_sig(sl, n)->startEA);
+   os_copy_to_clipboard(NULL);
 }
 
 
@@ -183,73 +173,74 @@ static void idaapi enter_list(slist_t * sl,uint32 n)
 /*              matched list                      */
 /*------------------------------------------------*/
 
-static void idaapi enter_match(void *obj,uint32 n)
-{
-	enter_list(((deng_t *)obj)->mlist, n);
+static void idaapi enter_match(void *obj, uint32 n) {
+   enter_list(((deng_t *)obj)->mlist, n);
 }
 
 
 /*------------------------------------------------*/
-/* function : enter_match                         */
+/* function : enter_identical                         */
 /* description: Jumps to code for element n in    */
 /*              identical list                    */
 /*------------------------------------------------*/
 
-static void idaapi enter_identical(void *obj,uint32 n)
-{
-	enter_list(((deng_t *)obj)->ilist, n);
+static void idaapi enter_identical(void *obj, uint32 n) {
+   enter_list(((deng_t *)obj)->ilist, n);
 }
 
 
 /*------------------------------------------------*/
-/* function : enter_match                         */
+/* function : enter_unmatch                         */
 /* description: Jumps to code for element n in    */
 /*              unmatched list                    */
 /*------------------------------------------------*/
 
-static void idaapi enter_unmatch(void *obj,uint32 n)
-{
-	psig_t *sig = ui_access_sig(((deng_t *)obj)->ulist, n);
+static void idaapi enter_unmatch(void *obj, uint32 n) {
+   psig_t *sig = ui_access_sig(((deng_t *)obj)->ulist, n);
 
-	if (sig->nfile == 1)
-		jumpto(sig->startEA);
-	else
-		os_copy_to_clipboard(NULL);
+   if (sig->nfile == 1) {
+      jumpto(sig->startEA);
+   }
+   else {
+      os_copy_to_clipboard(NULL);
+   }
 }
 
 
-static uint32 idaapi graph_list(slist_t * sl,uint32 n, options_t * opt)
-{
-	slist_t * sl1 = NULL;
-	slist_t * sl2 = NULL;
+static uint32 idaapi graph_list(slist_t *sl, uint32 n, options_t *opt) {
+   slist_t *sl1 = NULL;
+   slist_t *sl2 = NULL;
 
-	msg ("parsing second function...\n");
-	sl2 = parse_second_fct(ui_access_sig(sl, n)->msig->startEA, sl->file, opt);
-	if (!sl2)
-	{
-		msg("Error: FCT2 parsing failed.\n");
-		return 0;
-	}
+   msg ("parsing second function...\n");
+   sl2 = parse_second_fct(ui_access_sig(sl, n)->msig->startEA, sl->file, opt);
+   if (!sl2) {
+      msg("Error: FCT2 parsing failed.\n");
+      return 0;
+   }
 
-	msg ("parsing first function...\n");
-	sl1 = parse_fct(ui_access_sig(sl, n)->startEA, dto.graph.s_showpref);
-	if (!sl1)
-	{
-		msg("Error: FCT1 parsing failed.\n");
-		siglist_free(sl2);
-		return 0;
-	}
+   msg ("parsing first function...\n");
+#if IDA_SDK_VERSION < 700
+   sl1 = parse_fct(ui_access_sig(sl, n)->startEA, dto.graph.s_showpref);
+#else
+   // dto went away in 7.0, not clear how to replicate above
+   sl1 = parse_fct(ui_access_sig(sl, n)->startEA, 0);
+#endif
+   if (!sl1) {
+      msg("Error: FCT1 parsing failed.\n");
+      siglist_free(sl2);
+      return 0;
+   }
 
-	sl1->sigs[0]->nfile = 1;
-	sl2->sigs[0]->nfile = 2;
+   sl1->sigs[0]->nfile = 1;
+   sl2->sigs[0]->nfile = 2;
 
-	msg ("diffing functions...\n");
-	generate_diff(NULL, sl1, sl2, NULL, false, NULL);
+   msg ("diffing functions...\n");
+   generate_diff(NULL, sl1, sl2, NULL, false, NULL);
 
-	pgraph_display(sl1, sl2);
+   pgraph_display(sl1, sl2);
 
-	msg ("done!\n");
-	return 1;
+   msg ("done!\n");
+   return 1;
 }
 
 
@@ -259,14 +250,13 @@ static uint32 idaapi graph_list(slist_t * sl,uint32 n, options_t * opt)
 /*              matched list                      */
 /*------------------------------------------------*/
 
-static void idaapi graph_match(void *obj,uint32 n)
-{
-	slist_t * sl = ((deng_t *)obj)->mlist;
-	options_t * opt = ((deng_t *)obj)->opt;
+static void idaapi graph_match(void *obj, uint32 n) {
+   slist_t *sl = ((deng_t *)obj)->mlist;
+   options_t *opt = ((deng_t *)obj)->opt;
 
-	graph_list(sl, n, opt);
+   graph_list(sl, n, opt);
 
-	return;
+   return;
 }
 
 
@@ -276,14 +266,13 @@ static void idaapi graph_match(void *obj,uint32 n)
 /*              identical list                    */
 /*------------------------------------------------*/
 
-static void idaapi graph_identical(void *obj,uint32 n)
-{
-	slist_t * sl = ((deng_t *)obj)->ilist;
-	options_t * opt = ((deng_t *)obj)->opt;
+static void idaapi graph_identical(void *obj, uint32 n) {
+   slist_t *sl = ((deng_t *)obj)->ilist;
+   options_t *opt = ((deng_t *)obj)->opt;
 
-	graph_list(sl, n, opt);
+   graph_list(sl, n, opt);
 
-	return;
+   return;
 }
 
 
@@ -293,67 +282,68 @@ static void idaapi graph_identical(void *obj,uint32 n)
 /*              unmatched list                    */
 /*------------------------------------------------*/
 
-static void idaapi graph_unmatch(void *obj,uint32 n)
-{
-	slist_t * sl = NULL, * tmp = ((deng_t *)obj)->ulist;
+static void idaapi graph_unmatch(void *obj, uint32 n) {
+   slist_t *sl = NULL, *tmp = ((deng_t *)obj)->ulist;
 
-	if (ui_access_sig(tmp, n)->nfile == 2)
-	{
-		msg ("parsing second function...\n");
-		sl = parse_second_fct(ui_access_sig(tmp, n)->startEA, tmp->file, ((deng_t *)obj)->opt);
-		if (!sl)
-		{
-			msg("Error: FCT2 parsing failed.\n");
-			return;
-		}
+   if (ui_access_sig(tmp, n)->nfile == 2) {
+      msg ("parsing second function...\n");
+      sl = parse_second_fct(ui_access_sig(tmp, n)->startEA, tmp->file, ((deng_t *)obj)->opt);
+      if (!sl) {
+         msg("Error: FCT2 parsing failed.\n");
+         return;
+      }
 
-		sl->sigs[0]->nfile = 2;
-	}
-	else
-	{
-		msg ("parsing first function...\n");
-		sl = parse_fct(ui_access_sig(tmp, n)->startEA, dto.graph.s_showpref);
-		if (!sl)
-		{
-			msg("Error: FCT1 parsing failed.\n");
-			return;
-		}
+      sl->sigs[0]->nfile = 2;
+   }
+   else {
+      msg ("parsing first function...\n");
+#if IDA_SDK_VERSION < 700
+      sl = parse_fct(ui_access_sig(tmp, n)->startEA, dto.graph.s_showpref);
+#else
+      // dto went away in 7.0, not clear how to replicate above
+      sl = parse_fct(ui_access_sig(tmp, n)->startEA, 0);
+#endif
+      if (!sl) {
+         msg("Error: FCT1 parsing failed.\n");
+         return;
+      }
 
-		sl->sigs[0]->nfile = 1;
-	}
+      sl->sigs[0]->nfile = 1;
+   }
 
-	pgraph_display_one(sl);
+   pgraph_display_one(sl);
 
-	msg ("done!\n");
-	return;
+   msg ("done!\n");
+   return;
 }
 
 
-static uint32 idaapi res_unmatch(deng_t * d,uint32 n, int type)
-{
-	slist_t * sl;
+static uint32 idaapi res_unmatch(deng_t *d, uint32 n, int type) {
+   slist_t *sl;
 
-	if (type == 0)
-		sl = d->ilist;
-	else
-		sl = d->mlist;
+   if (type == 0) {
+      sl = d->ilist;
+   }
+   else {
+      sl = d->mlist;
+   }
 
-	psig_t *sig = ui_access_sig(sl, n);
-	
-	sig->nfile = 1;
-	sig->msig->nfile = 2;
+   psig_t *sig = ui_access_sig(sl, n);
+   
+   sig->nfile = 1;
+   sig->msig->nfile = 2;
 
-	siglist_add(d->ulist, sig);
-	siglist_add(d->ulist, sig->msig);
+   siglist_add(d->ulist, sig);
+   siglist_add(d->ulist, sig->msig);
 
-	sig->msig->msig = NULL;
-	sig->msig = NULL;
+   sig->msig->msig = NULL;
+   sig->msig = NULL;
 
-	siglist_remove(sl, n - 1);
+   siglist_remove(sl, n - 1);
 
-	refresh_chooser(title_unmatch);
+   refresh_chooser(title_unmatch);
 
-	return 1;
+   return 1;
 }
 
 
@@ -363,9 +353,8 @@ static uint32 idaapi res_unmatch(deng_t * d,uint32 n, int type)
 /*              list                              */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_iunmatch(void *obj,uint32 n)
-{
-	return res_unmatch((deng_t *)obj, n, 0);
+static uint32 idaapi res_iunmatch(void *obj, uint32 n) {
+   return res_unmatch((deng_t *)obj, n, 0);
 }
 
 
@@ -375,9 +364,8 @@ static uint32 idaapi res_iunmatch(void *obj,uint32 n)
 /*              list                              */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_munmatch(void *obj,uint32 n)
-{
-	return res_unmatch((deng_t *)obj, n, 1);
+static uint32 idaapi res_munmatch(void *obj, uint32 n) {
+   return res_unmatch((deng_t *)obj, n, 1);
 }
 
 
@@ -387,57 +375,56 @@ static uint32 idaapi res_munmatch(void *obj,uint32 n)
 /*              option is set in dialog box       */
 /*------------------------------------------------*/
 
-void propagate_match(deng_t * eng, psig_t * s1, psig_t * s2, int options)
-{
-	size_t i;
-	deng_t * d = NULL;
-	slist_t * l1, * l2;
+void propagate_match(deng_t *eng, psig_t *s1, psig_t *s2, int options) {
+   size_t i;
+   deng_t *d = NULL;
+   slist_t *l1, *l2;
 
-	if (options)
-	{
-		show_wait_box ("PatchDiff is in progress ...");
+   if (options) {
+      show_wait_box ("PatchDiff is in progress ...");
 
-		l1 = siglist_init(eng->ulist->num, eng->ulist->file);
-		l2 = siglist_init(eng->ulist->num, eng->ulist->file);
+      l1 = siglist_init(eng->ulist->num, eng->ulist->file);
+      l2 = siglist_init(eng->ulist->num, eng->ulist->file);
 
-		for (i=0; i<eng->ulist->num; i++)
-			if (!eng->ulist->sigs[i]->msig)
-			{
-				if (eng->ulist->sigs[i]->nfile == 1)
-					siglist_add(l1, eng->ulist->sigs[i]);
-				else
-					siglist_add(l2, eng->ulist->sigs[i]);
-			}
+      for (i=0; i<eng->ulist->num; i++) {
+         if (!eng->ulist->sigs[i]->msig) {
+            if (eng->ulist->sigs[i]->nfile == 1) {
+               siglist_add(l1, eng->ulist->sigs[i]);
+            }
+            else {
+               siglist_add(l2, eng->ulist->sigs[i]);
+            }
+         }
+      }
+      generate_diff(&d, l1, l2, eng->ulist->file, false, NULL);
 
-		generate_diff(&d, l1, l2, eng->ulist->file, false, NULL);
+      siglist_partial_free(l1);
+      siglist_partial_free(l2);
 
-		siglist_partial_free(l1);
-		siglist_partial_free(l2);
+      hide_wait_box();
+   }
 
-		hide_wait_box();
-	}
+   i = 0;
+   while (i<eng->ulist->num) {
+      s1 = eng->ulist->sigs[i];
+      s2 = s1->msig;
 
-	i = 0;
-	while (i<eng->ulist->num)
-	{
-		s1 = eng->ulist->sigs[i];
-		s2 = s1->msig;
+      if (!s2) {
+         i++;
+      }
+      else {
+         if (s1->nfile == 1) {
+            if (sig_equal(s1, s2, DIFF_EQUAL_SIG_HASH)) {
+               siglist_add(eng->ilist, s1);
+            }
+            else {
+               siglist_add(eng->mlist, s1);
+            }
+         }
 
-		if (!s2) 
-			i++;
-		else
-		{
-			if (s1->nfile == 1)
-			{
-				if (sig_equal(s1, s2, DIFF_EQUAL_SIG_HASH))
-					siglist_add(eng->ilist, s1);
-				else
-					siglist_add(eng->mlist, s1);
-			}
-
-			siglist_remove(eng->ulist, i);
-		}
-	}
+         siglist_remove(eng->ulist, i);
+      }
+   }
 }
 
 
@@ -447,50 +434,47 @@ void propagate_match(deng_t * eng, psig_t * s1, psig_t * s2, int options)
 /*              list                              */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_match(void *obj,uint32 n)
-{
-	deng_t * eng = (deng_t *)obj;
-	psig_t * s1, * s2;
-	int option;
-	ea_t ea = BADADDR;
-	size_t i;
+static uint32 idaapi res_match(void *obj,uint32 n) {
+   deng_t *eng = (deng_t *)obj;
+   psig_t *s1, *s2;
+   int option;
+   ea_t ea = BADADDR;
+   size_t i;
 
-	const char format[] =
-			"STARTITEM 0\n"
+   const char format[] =
+         "STARTITEM 0\n"
 
-			"Set Match\n"
-			"<Match address:$:32:32::>\n\n"
+         "Set Match\n"
+         "<Match address:$:32:32::>\n\n"
 
-			"Options :\n" 
-			"<Propagate :C>>\n\n"
-			;
+         "Options :\n" 
+         "<Propagate :C>>\n\n"
+         ;
 
-	option = 1;
-	if (AskUsingForm_c(format, &ea, &option))
-	{
-		s1 = ui_access_sig(eng->ulist, n);
+   option = 1;
+   if (AskUsingForm_c(format, &ea, &option)) {
+      s1 = ui_access_sig(eng->ulist, n);
 
-		for (i=0; i<eng->ulist->num; i++)
-		{
-			s2 = eng->ulist->sigs[i];
+      for (i = 0; i < eng->ulist->num; i++) {
+         s2 = eng->ulist->sigs[i];
 
-			if (s2->startEA != ea || (s2->nfile == s1->nfile))
-				continue;
+         if (s2->startEA != ea || (s2->nfile == s1->nfile)) {
+            continue;
+         }
+         sig_set_matched_sig(s1, s2, DIFF_MANUAL);
+         propagate_match(eng, s1, s2, option);
 
-			sig_set_matched_sig(s1, s2, DIFF_MANUAL);
-			propagate_match(eng, s1, s2, option);
+         refresh_chooser(title_match);
+         refresh_chooser(title_identical);
 
-			refresh_chooser(title_match);
-			refresh_chooser(title_identical);
+         return 1;
+      }
 
-			return 1;
-		}
+      warning("Address '%a' is not valid.", ea);
+      return 0;
+   }
 
-		warning("Address '%a' is not valid.", ea);
-		return 0;
-	}
-
-	return 1;
+   return 1;
 }
 
 
@@ -500,19 +484,18 @@ static uint32 idaapi res_match(void *obj,uint32 n)
 /*              to identical list                 */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_mtoi(void *obj,uint32 n)
-{
-	deng_t * d = (deng_t *)obj;
-	psig_t *sig = ui_access_sig(d->mlist, n);
+static uint32 idaapi res_mtoi(void *obj, uint32 n) {
+   deng_t *d = (deng_t *)obj;
+   psig_t *sig = ui_access_sig(d->mlist, n);
 
-	sig->mtype = sig->msig->mtype = DIFF_MANUAL;
+   sig->mtype = sig->msig->mtype = DIFF_MANUAL;
 
-	siglist_add(d->ilist, sig);
-	siglist_remove(d->mlist, n - 1);
+   siglist_add(d->ilist, sig);
+   siglist_remove(d->mlist, n - 1);
 
-	refresh_chooser(title_identical);
+   refresh_chooser(title_identical);
 
-	return 1;
+   return 1;
 }
 
 
@@ -522,19 +505,18 @@ static uint32 idaapi res_mtoi(void *obj,uint32 n)
 /*              to matched list                   */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_itom(void *obj,uint32 n)
-{
-	deng_t * d = (deng_t *)obj;
-	psig_t *sig = ui_access_sig(d->ilist, n);
+static uint32 idaapi res_itom(void *obj, uint32 n) {
+   deng_t *d = (deng_t *)obj;
+   psig_t *sig = ui_access_sig(d->ilist, n);
 
-	sig->mtype = sig->msig->mtype = DIFF_MANUAL;
+   sig->mtype = sig->msig->mtype = DIFF_MANUAL;
 
-	siglist_add(d->mlist, sig);
-	siglist_remove(d->ilist, n - 1);
+   siglist_add(d->mlist, sig);
+   siglist_remove(d->ilist, n - 1);
 
-	refresh_chooser(title_match);
+   refresh_chooser(title_match);
 
-	return 1;
+   return 1;
 }
 
 
@@ -543,77 +525,552 @@ static uint32 idaapi res_itom(void *obj,uint32 n)
 /* description: Sets element as flagged/unflagged */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_flagged(void *obj,uint32 n)
-{
-	psig_t *sig = ui_access_sig(((deng_t *)obj)->mlist, n);
+static uint32 idaapi res_flagged(void *obj, uint32 n) {
+   psig_t *sig = ui_access_sig(((deng_t *)obj)->mlist, n);
 
-	sig->flag = !sig->flag;
+   sig->flag = !sig->flag;
 
-	refresh_chooser(title_match);
+   refresh_chooser(title_match);
 
-	return 1;
+   return 1;
 }
 
 
-static void transfer_sym(psig_t *sig)
-{
-	psig_t *rhs = sig->msig;
-	sig_set_name(sig, rhs->name);
-	set_name(sig->startEA, rhs->name, SN_NOCHECK | SN_NON_AUTO);
+static void transfer_sym(psig_t *sig) {
+   psig_t *rhs = sig->msig;
+   sig_set_name(sig, rhs->name);
+   set_name(sig->startEA, rhs->name.c_str(), SN_NOCHECK | SN_NON_AUTO);
 }
 
 
-static uint32 idaapi transfer_sym_match(void *obj, uint32 n)
-{
-	psig_t *sig = ui_access_sig(((deng_t *)obj)->mlist, n);
+static uint32 idaapi transfer_sym_match(void *obj, uint32 n) {
+   psig_t *sig = ui_access_sig(((deng_t *)obj)->mlist, n);
 
-	transfer_sym(sig);
+   transfer_sym(sig);
 
-	return 1;
+   return 1;
 }
 
 
-static uint32 idaapi transfer_sym_identical(void *obj, uint32 n)
-{
-	psig_t *sig = ui_access_sig(((deng_t *)obj)->ilist, n);
+static uint32 idaapi transfer_sym_identical(void *obj, uint32 n) {
+   psig_t *sig = ui_access_sig(((deng_t *)obj)->ilist, n);
 
-	transfer_sym(sig);
+   transfer_sym(sig);
 
-	return 1;
+   return 1;
 }
+
+#if IDA_SDK_VERSION >= 670
+#define MUNMATCH_NAME "patchdiff:munmatch"
+//-------------------------------------------------------------------------
+struct munmatch_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_munmatch(eng, n);
+#else
+         return res_munmatch(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+   
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_match, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_match;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static munmatch_action_handler_t munmatch_action_handler;
+static const action_desc_t munmatch_action = ACTION_DESC_LITERAL(MUNMATCH_NAME, "Unmatch", &munmatch_action_handler, NULL, NULL, -1);
+
+#define IDENTICAL_NAME "patchdiff:identical"
+//-------------------------------------------------------------------------
+struct identical_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_mtoi(eng, n);
+#else
+         return res_mtoi(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_match, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_match;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static identical_action_handler_t identical_action_handler;
+static const action_desc_t identical_action = ACTION_DESC_LITERAL(IDENTICAL_NAME, "Set as identical", &identical_action_handler, NULL, NULL, -1);
+
+#define FLAGUNFLAG_NAME "patchdiff:flagunflag"
+//-------------------------------------------------------------------------
+struct flagunflag_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_flagged(eng, n);
+#else
+         return res_flagged(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_match, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_match;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static flagunflag_action_handler_t flagunflag_action_handler;
+static const action_desc_t flagunflag_action = ACTION_DESC_LITERAL(FLAGUNFLAG_NAME, "Flag/unflag", &flagunflag_action_handler, NULL, NULL, -1);
+
+#define MSYM_NAME "patchdiff:msym"
+//-------------------------------------------------------------------------
+struct msym_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return transfer_sym_match(eng, n);
+#else
+         return transfer_sym_match(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_match, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_match;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static msym_action_handler_t msym_action_handler;
+static const action_desc_t msym_action = ACTION_DESC_LITERAL(MSYM_NAME, "Import Symbol", &msym_action_handler, NULL, NULL, -1);
+
+#define IUNMATCH_NAME "patchdiff:iunmatch"
+//-------------------------------------------------------------------------
+struct iunmatch_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_iunmatch(eng, n);
+#else
+         return res_iunmatch(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_identical, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_identical;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static iunmatch_action_handler_t iunmatch_action_handler;
+static const action_desc_t iunmatch_action = ACTION_DESC_LITERAL(IUNMATCH_NAME, "Unmatch", &iunmatch_action_handler, NULL, NULL, -1);
+
+#define ITOM_NAME "patchdiff:itom"
+//-------------------------------------------------------------------------
+struct itom_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_itom(eng, n);
+#else
+         return res_itom(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_identical, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_identical;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static itom_action_handler_t itom_action_handler;
+static const action_desc_t itom_action = ACTION_DESC_LITERAL(ITOM_NAME, "Set as matched", &itom_action_handler, NULL, NULL, -1);
+
+#define ISYM_NAME "patchdiff:isym"
+//-------------------------------------------------------------------------
+struct isym_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return transfer_sym_identical(eng, n);
+#else
+         return transfer_sym_identical(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_identical, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_identical;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static isym_action_handler_t isym_action_handler;
+static const action_desc_t isym_action = ACTION_DESC_LITERAL(ISYM_NAME, "Import symbol", &isym_action_handler, NULL, NULL, -1);
+
+
+#define MATCH_NAME "patchdiff:match"
+//-------------------------------------------------------------------------
+struct match_action_handler_t : public action_handler_t {
+   virtual int idaapi activate(action_activation_ctx_t *ctx) {
+      uint32 n = ctx->chooser_selection.size();
+      if (n == 1) {
+         n = ctx->chooser_selection[0];
+#if IDA_SDK_VERSION < 700
+         return res_match(eng, n);
+#else
+         return res_match(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+#endif
+      }
+      return 0;
+   }
+
+   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
+      bool ok = ctx->form_type == BWN_CHOOSER;
+      if (ok) {
+         //it's a chooser, now make sure it's the correct form
+#if IDA_SDK_VERSION < 700
+         char name[MAXSTR];
+         ok = get_tform_title(ctx->form, name, sizeof(name)) && strneq(name, title_unmatch, qstrlen(title_match));
+#else
+         qstring title;
+         ok = get_widget_title(&title, ctx->widget) && title == title_unmatch;
+#endif
+      }
+      return ok ? AST_ENABLE_FOR_FORM : AST_DISABLE_FOR_FORM;
+   }
+};
+static match_action_handler_t match_action_handler;
+static const action_desc_t match_action = ACTION_DESC_LITERAL(MATCH_NAME, "Set match", &match_action_handler, NULL, NULL, -1);
+#endif
+
+#if IDA_SDK_VERSION >= 700
+
+static void idaapi desc_dlist(slist_t *sl, uint32 n, qstrvec_t *cols_) {
+   qstrvec_t &cols = *cols_;
+   psig_t *sig = ui_access_sig(sl, n + 1); //hack because pre-7.0 choosers index from 1
+   cols[0].sprnt("%u", sig->mtype);
+   cols[1].sprnt("%s", sig->name.c_str());
+   cols[2].sprnt("%s", sig->msig->name.c_str());
+   cols[3].sprnt("%a", sig->startEA);
+   cols[4].sprnt("%a", sig->msig->startEA);
+   cols[5].sprnt("%c", sig->id_crc ? '+' : '-');
+   cols[6].sprnt("%lx", sig->crc_hash);
+   cols[7].sprnt("%lx", sig->msig->crc_hash);
+}
+
+
+//-------------------------------------------------------------------------
+struct matched_chooser_t : public chooser_t {
+private:
+   deng_t *eng;
+public:
+   // this object must be allocated using `new`
+   matched_chooser_t(deng_t *eng_);
+
+  // function that is used to decide whether a new chooser should be opened
+  // or we can use the existing one.
+  // The contents of the window are completely determined by its title
+   virtual const void *get_obj_id(size_t *len) const {
+      *len = strlen(title);
+      return title;
+   }
+
+   // function that returns number of lines in the list
+   virtual size_t idaapi get_count() const {
+      return sizer_dlist(eng ? eng->mlist : NULL);
+   }
+
+   // function that generates the list line
+   virtual void idaapi get_row(qstrvec_t *cols, int *icon_, chooser_item_attrs_t *attrs, size_t n) const;
+
+   // function that is called when the user hits Enter
+   virtual cbret_t idaapi enter(size_t n) {
+      enter_list(eng->mlist, n + 1);  //hack because pre-7.0 choosers index from 1
+      return cbret_t(); // nothing changed
+   }
+   
+   virtual cbret_t idaapi edit(size_t n) {
+      graph_match(eng, n + 1); //hack because pre-7.0 choosers index from 1
+      return cbret_t(); // nothing changed
+   }
+   
+   virtual void idaapi closed() {
+      close_window(eng);
+   }
+};
+
+inline matched_chooser_t::matched_chooser_t(deng_t *eng_) :
+      chooser_t(CH_ATTRS | CH_CAN_EDIT, qnumber(widths_match), widths_match, header_match, title_match) {
+   eng = eng_;  
+   popup_names[POPUP_EDIT] = "Display Graphs";
+}
+
+void idaapi matched_chooser_t::get_row(qstrvec_t *cols_, int *, chooser_item_attrs_t *, size_t n) const {
+   desc_dlist(eng ? eng->mlist : NULL, n, cols_);
+}
+
+static matched_chooser_t *matched_chooser;
+
+//-------------------------------------------------------------------------
+struct identical_chooser_t : public chooser_t {
+private:
+   deng_t *eng;
+public:
+   // this object must be allocated using `new`
+   identical_chooser_t(deng_t *eng_);
+
+  // function that is used to decide whether a new chooser should be opened
+  // or we can use the existing one.
+  // The contents of the window are completely determined by its title
+   virtual const void *get_obj_id(size_t *len) const {
+      *len = strlen(title);
+      return title;
+   }
+
+   // function that returns number of lines in the list
+   virtual size_t idaapi get_count() const {
+      return sizer_dlist(eng ? eng->ilist : NULL);
+   }
+
+   // function that generates the list line
+   virtual void idaapi get_row(qstrvec_t *cols, int *icon_, chooser_item_attrs_t *attrs, size_t n) const;
+
+   // function that is called when the user hits Enter
+   virtual cbret_t idaapi enter(size_t n) {
+      enter_list(eng->ilist, n + 1); //hack because pre-7.0 choosers index from 1
+      return cbret_t(); // nothing changed
+   }
+
+   virtual cbret_t idaapi edit(size_t n) {
+      graph_identical(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+      return cbret_t(); // nothing changed
+   }
+
+   virtual void idaapi closed() {
+      close_window(eng);
+   }
+};
+
+inline identical_chooser_t::identical_chooser_t(deng_t *eng_) :
+      chooser_t(CH_ATTRS | CH_CAN_EDIT, qnumber(widths_match), widths_match, header_match, title_identical) {
+   eng = eng_;  
+   popup_names[POPUP_EDIT] = "Display Graphs";
+}
+
+void idaapi identical_chooser_t::get_row(qstrvec_t *cols_, int *, chooser_item_attrs_t *, size_t n) const {
+   desc_dlist(eng ? eng->ilist : NULL, n, cols_);
+}
+
+static identical_chooser_t *identical_chooser;
+
+//-------------------------------------------------------------------------
+struct unmatched_chooser_t : public chooser_t {
+private:
+   deng_t *eng;
+public:
+   // this object must be allocated using `new`
+   unmatched_chooser_t(deng_t *eng_);
+
+  // function that is used to decide whether a new chooser should be opened
+  // or we can use the existing one.
+  // The contents of the window are completely determined by its title
+   virtual const void *get_obj_id(size_t *len) const {
+      *len = strlen(title);
+      return title;
+   }
+
+   // function that returns number of lines in the list
+   virtual size_t idaapi get_count() const {
+      return sizer_dlist(eng ? eng->ulist : NULL);
+   }
+
+   // function that generates the list line
+   virtual void idaapi get_row(qstrvec_t *cols, int *icon_, chooser_item_attrs_t *attrs, size_t n) const;
+
+   // function that is called when the user hits Enter
+   virtual cbret_t idaapi enter(size_t n) {
+      psig_t *sig = ui_access_sig(eng->ulist, n + 1);  //hack because pre-7.0 choosers index from 1
+      
+      if (sig->nfile == 1)
+         jumpto(sig->startEA);
+      else
+         os_copy_to_clipboard(NULL);
+
+      return cbret_t(); // nothing changed
+   }
+
+   virtual cbret_t idaapi edit(size_t n) {
+      graph_unmatch(eng, n + 1);  //hack because pre-7.0 choosers index from 1
+      return cbret_t(); // nothing changed
+   }
+
+   virtual void idaapi closed() {
+      close_window(eng);
+   }
+};
+
+inline unmatched_chooser_t::unmatched_chooser_t(deng_t *eng_) :
+      chooser_t(CH_ATTRS | CH_CAN_EDIT, qnumber(widths_unmatch), widths_unmatch, header_unmatch, title_unmatch) {
+   eng = eng_;  
+   popup_names[POPUP_EDIT] = "Display Graph";
+}
+
+void idaapi unmatched_chooser_t::get_row(qstrvec_t *cols_, int *, chooser_item_attrs_t *, size_t n) const {
+   qstrvec_t &cols = *cols_;
+   psig_t *sig = ui_access_sig(eng->ulist, n + 1);  //hack because pre-7.0 choosers index from 1
+   cols[0].sprnt("%u", sig->nfile);
+   cols[1].sprnt("%s", sig->name.c_str());
+   cols[2].sprnt("%a", sig->startEA);
+   cols[3].sprnt("%.8lX", sig->sig);
+   cols[4].sprnt("%.8lX", sig->hash);
+   cols[5].sprnt("%.8lX", sig->crc_hash);
+}
+
+static unmatched_chooser_t *unmatched_chooser;
+
+#endif
 
 /*------------------------------------------------*/
 /* function : display_matched                     */
 /* description: Displays matched list             */
 /*------------------------------------------------*/
 
-static void display_matched(deng_t * eng)
-{
-	choose2(CH_ATTRS,
-		-1, -1, -1, -1,       // position is determined by Windows
-		eng,                  // pass the created function list to the window
-		qnumber(header_match),// number of columns
-		widths_match,		  // widths of columns
-		sizer_match,          // function that returns number of lines
-		desc_match,           // function that generates a line
-		title_match,	      // window title
-		-1,                   // use the default icon for the window
-		1,                    // position the cursor on the first line
-		NULL,                 // "kill" callback
-		NULL,                 // "new" callback
-		NULL,                 // "update" callback
-		graph_match,          // "edit" callback
-		enter_match,          // function to call when the user pressed Enter
-		close_window,         // function to call when the window is closed
-		popup_match,          // use default popup menu items
-		NULL);  
+static void display_matched(deng_t *eng) {
+#if IDA_SDK_VERSION <= 695
+   choose2(CH_ATTRS,
+      -1, -1, -1, -1,       // position is determined by Windows
+      eng,                  // pass the created function list to the window
+      qnumber(header_match),// number of columns
+      widths_match,       // widths of columns
+      sizer_match,          // function that returns number of lines
+      desc_match,           // function that generates a line
+      title_match,         // window title
+      -1,                   // use the default icon for the window
+      1,                    // position the cursor on the first line
+      NULL,                 // "kill" callback
+      NULL,                 // "new" callback
+      NULL,                 // "update" callback
+      graph_match,          // "edit" callback
+      enter_match,          // function to call when the user pressed Enter
+      close_window,         // function to call when the window is closed
+      popup_match,          // use default popup menu items
+      NULL);
+#else
+   if (matched_chooser == NULL) {
+      matched_chooser = new matched_chooser_t(eng);
+      matched_chooser->choose(chooser_t::NO_SELECTION);
+   }
+#endif
 
-	eng->wnum++;
-	
-	add_chooser_command(title_match, "Unmatch", res_munmatch, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
-	add_chooser_command(title_match, "Set as identical", res_mtoi, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
-	add_chooser_command(title_match, "Flag/unflag", res_flagged, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
-	add_chooser_command(title_match, "Import Symbol", transfer_sym_match, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   eng->wnum++;
+   
+#if IDA_SDK_VERSION <= 660 
+   add_chooser_command(title_match, "Unmatch", res_munmatch, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   add_chooser_command(title_match, "Set as identical", res_mtoi, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   add_chooser_command(title_match, "Flag/unflag", res_flagged, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   add_chooser_command(title_match, "Import Symbol", transfer_sym_match, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+#else
+#if IDA_SDK_VERSION <= 695
+   TForm *form = find_tform(title_match);
+#else
+   TWidget *form = find_widget(title_match);
+#endif
+   attach_action_to_popup(form, NULL, MUNMATCH_NAME);
+   attach_action_to_popup(form, NULL, IDENTICAL_NAME);
+   attach_action_to_popup(form, NULL, FLAGUNFLAG_NAME);
+   attach_action_to_popup(form, NULL, MSYM_NAME);
+#endif
 }
 
 
@@ -622,32 +1079,49 @@ static void display_matched(deng_t * eng)
 /* description: Displays identical list           */
 /*------------------------------------------------*/
 
-static void display_identical(deng_t * eng)
-{
-	choose2(0,
-		-1, -1, -1, -1,       // position is determined by Windows
-		eng,                  // pass the created function list to the window
-		qnumber(header_match),// number of columns
-		widths_match,		  // widths of columns
-		sizer_identical,      // function that returns number of lines
-		desc_identical,       // function that generates a line
-		title_identical,	  // window title
-		-1,                   // use the default icon for the window
-		1,                    // position the cursor on the first line
-		NULL,                 // "kill" callback
-		NULL,                 // "new" callback
-		NULL,                 // "update" callback
-		graph_identical,      // "edit" callback
-		enter_identical,      // function to call when the user pressed Enter
-		close_window,         // function to call when the window is closed
-		popup_match,          // use default popup menu items
-		NULL);  
+static void display_identical(deng_t *eng) {
+#if IDA_SDK_VERSION <= 695
+   choose2(0,
+      -1, -1, -1, -1,       // position is determined by Windows
+      eng,                  // pass the created function list to the window
+      qnumber(header_match),// number of columns
+      widths_match,       // widths of columns
+      sizer_identical,      // function that returns number of lines
+      desc_identical,       // function that generates a line
+      title_identical,    // window title
+      -1,                   // use the default icon for the window
+      1,                    // position the cursor on the first line
+      NULL,                 // "kill" callback
+      NULL,                 // "new" callback
+      NULL,                 // "update" callback
+      graph_identical,      // "edit" callback
+      enter_identical,      // function to call when the user pressed Enter
+      close_window,         // function to call when the window is closed
+      popup_match,          // use default popup menu items
+      NULL);  
+#else
+   if (identical_chooser == NULL) {
+      identical_chooser = new identical_chooser_t(eng);
+      identical_chooser->choose(chooser_t::NO_SELECTION);
+   }
+#endif
 
-	eng->wnum++;
-	
-	add_chooser_command(title_identical, "Unmatch", res_iunmatch, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
-	add_chooser_command(title_identical, "Set as matched", res_itom, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
-	add_chooser_command(title_identical, "Import Symbol", transfer_sym_identical, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   eng->wnum++;
+   
+#if IDA_SDK_VERSION <= 660 
+   add_chooser_command(title_identical, "Unmatch", res_iunmatch, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   add_chooser_command(title_identical, "Set as matched", res_itom, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   add_chooser_command(title_identical, "Import Symbol", transfer_sym_identical, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+#else
+#if IDA_SDK_VERSION <= 695
+   TForm *form = find_tform(title_identical);
+#else
+   TWidget *form = find_widget(title_identical);
+#endif
+   attach_action_to_popup(form, NULL, IUNMATCH_NAME);
+   attach_action_to_popup(form, NULL, ITOM_NAME);
+   attach_action_to_popup(form, NULL, ISYM_NAME);
+#endif
 }
 
 
@@ -656,30 +1130,45 @@ static void display_identical(deng_t * eng)
 /* description: Displays unmatched list           */
 /*------------------------------------------------*/
 
-static void display_unmatched(deng_t * eng)
-{
-	choose2(0,
-		-1, -1, -1, -1,       // position is determined by Windows
-		eng,                  // pass the created function list to the window
-		qnumber(header_unmatch),// number of columns
-		widths_unmatch,		  // widths of columns
-		sizer_unmatch,        // function that returns number of lines
-		desc_unmatch,         // function that generates a line
-		title_unmatch,	      // window title
-		-1,                   // use the default icon for the window
-		1,                    // position the cursor on the first line
-		NULL,                 // "kill" callback
-		NULL,                 // "new" callback
-		NULL,                 // "update" callback
-		graph_unmatch,        // "edit" callback
-		enter_unmatch,        // function to call when the user pressed Enter
-		close_window,         // function to call when the window is closed
-		popup_unmatch,        // use default popup menu items
-		NULL);                // use the same icon for all lines
+static void display_unmatched(deng_t *eng) {
+#if IDA_SDK_VERSION <= 695
+   choose2(0,
+      -1, -1, -1, -1,       // position is determined by Windows
+      eng,                  // pass the created function list to the window
+      qnumber(header_unmatch),// number of columns
+      widths_unmatch,        // widths of columns
+      sizer_unmatch,        // function that returns number of lines
+      desc_unmatch,         // function that generates a line
+      title_unmatch,       // window title
+      -1,                   // use the default icon for the window
+      1,                    // position the cursor on the first line
+      NULL,                 // "kill" callback
+      NULL,                 // "new" callback
+      NULL,                 // "update" callback
+      graph_unmatch,        // "edit" callback
+      enter_unmatch,        // function to call when the user pressed Enter
+      close_window,         // function to call when the window is closed
+      popup_unmatch,        // use default popup menu items
+      NULL);                // use the same icon for all lines
+#else
+   if (unmatched_chooser == NULL) {
+      unmatched_chooser = new unmatched_chooser_t(eng);
+      unmatched_chooser->choose(chooser_t::NO_SELECTION);
+   }
+#endif
 
-	eng->wnum++;
-	
-	add_chooser_command(title_unmatch, "Set match", res_match, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+   eng->wnum++;
+   
+#if IDA_SDK_VERSION <= 660 
+   add_chooser_command(title_unmatch, "Set match", res_match, 0, -1, CHOOSER_POPUP_MENU | CHOOSER_MENU_EDIT);
+#else
+#if IDA_SDK_VERSION <= 695
+   TForm *form = find_tform(title_unmatch);
+#else
+   TWidget *form = find_widget(title_unmatch);
+#endif
+   attach_action_to_popup(form, NULL, MATCH_NAME);
+#endif
 }
 
 
@@ -688,36 +1177,53 @@ static void display_unmatched(deng_t * eng)
 /* description: Catchs lists to change bg color   */
 /*------------------------------------------------*/
 
-int idaapi ui_callback(void * data, int event_id, va_list va)
-{
-  if ( event_id == ui_get_chooser_item_attrs )  
-  {
-	  void * co = va_arg(va, void *);
-	  uint32 n = va_arg(va, uint32);
-	  chooser_item_attrs_t *attrs = va_arg(va, chooser_item_attrs_t *);
-	  if (attrs != NULL)
-	  {
-		deng_t * d = (deng_t *)co;
-		if (d && d->magic == 0x0BADF00D && n > 0)
-			if (ui_access_sig(d->mlist, n)->flag == 1)
-				attrs->color = 0x908070;
-	  }
-  }
+#if IDA_SDK_VERSION < 700
+int idaapi ui_callback(void *data, int event_id, va_list va) {
+#else
+ssize_t idaapi ui_callback(void *data, int event_id, va_list va) {
+#endif
+   if (event_id == ui_get_chooser_item_attrs) {
+      void *co = va_arg(va, void *);
+      uint32 n = va_arg(va, uint32);
+#if IDA_SDK_VERSION >= 700
+      n += 1;  //hack because pre-7.0 choosers index from 1
+#endif
+      chooser_item_attrs_t *attrs = va_arg(va, chooser_item_attrs_t *);
+      if (attrs != NULL) {
+         deng_t *d = (deng_t *)co;
+         if (d && d->magic == 0x0BADF00D && n > 0) {
+            if (ui_access_sig(d->mlist, n)->flag == 1) {
+               attrs->color = 0x908070;
+            }
+         }
+      }
+   }
 
-  return 0;
+   return 0;
 }
-
 
 /*------------------------------------------------*/
 /* function : display_results                     */
 /* description: Displays diff results             */
 /*------------------------------------------------*/
 
-void display_results(deng_t * eng)
-{
-	hook_to_notification_point(HT_UI, ui_callback, NULL);
+void display_results(deng_t *_eng) {
+   eng = _eng;
 
-	display_matched(eng);
-	display_unmatched(eng);
-	display_identical(eng);
+#if IDA_SDK_VERSION >= 670
+   register_action(munmatch_action);
+   register_action(identical_action);
+   register_action(flagunflag_action);
+   register_action(msym_action);
+   register_action(iunmatch_action);
+   register_action(itom_action);
+   register_action(isym_action);
+   register_action(match_action);
+#endif
+
+   hook_to_notification_point(HT_UI, ui_callback, NULL);
+
+   display_matched(eng);
+   display_unmatched(eng);
+   display_identical(eng);
 }

@@ -17,10 +17,10 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "hash.hpp"
-#include "sig.hpp"
+#include "hash.h"
+#include "sig.h"
 
 
 /*------------------------------------------------*/
@@ -28,30 +28,31 @@
 /* description: Initializes hash table to NULL    */
 /*------------------------------------------------*/
 
-hpsig_t * hash_init(size_t num)
-{
-	unsigned int i;
-	hpsig_t * hsig;
-	static unsigned int primes[] = { 67, 251, 509, 1021, 2039, 4093, 8191, 16381, 32749, 65521, 131071, 262139, 524287, 1048573, 2097143 };
+hpsig_t *hash_init(size_t num) {
+   unsigned int i;
+   hpsig_t *hsig;
+   static unsigned int primes[] = { 67, 251, 509, 1021, 2039, 4093, 8191, 16381, 32749, 65521, 131071, 262139, 524287, 1048573, 2097143 };
 
-	for (i=0; i < ((sizeof(primes) / sizeof(unsigned int)) - 1); i++)
-		if (primes[i] > (num/3)) break;
+   for (i = 0; i < ((sizeof(primes) / sizeof(unsigned int)) - 1); i++) {
+      if (primes[i] > (num/3)) {
+         break;
+      }
+   }
+   hsig = (hpsig_t *)qalloc(sizeof(*hsig));
+   if (!hsig) {
+      return NULL;
+   }
+   hsig->max_hash = primes[i];
+   hsig->table = (hsignature_t **) qalloc(hsig->max_hash * sizeof(*hsig->table));
+   if (!hsig->table) {
+      qfree(hsig);
+      return NULL;
+   }
 
-	hsig = (hpsig_t *)qalloc(sizeof(*hsig));
-	if (!hsig) return NULL;
-
-	hsig->max_hash = primes[i];
-	hsig->table = (hsignature_t **) qalloc(hsig->max_hash * sizeof(*hsig->table));
-	if (!hsig->table)
-	{
-		qfree(hsig);
-		return NULL;
-	}
-
-	for (i = 0; i < hsig->max_hash; i++)
-		hsig->table[i] = NULL;
-
-	return hsig;
+   for (i = 0; i < hsig->max_hash; i++) {
+      hsig->table[i] = NULL;
+   }
+   return hsig;
 }
 
 
@@ -60,26 +61,24 @@ hpsig_t * hash_init(size_t num)
 /* description: Creates hash value                */
 /*------------------------------------------------*/
 
-unsigned int hash_mk_ea(hpsig_t * htable, ea_t val)
-{
-	char * ptr;
-	unsigned int h = 0;
-	int i;
+unsigned int hash_mk_ea(hpsig_t *htable, ea_t val) {
+   char *ptr;
+   unsigned int h = 0;
+   int i;
 
-	ptr = (char *) &val;
+   ptr = (char *) &val;
 
-	for (i=0; i<sizeof(val); i++)
-	{
-		h += ptr[i];
-		h += ( h << 10 );
-		h ^= ( h >> 6 );
-	}
+   for (i = 0; i < sizeof(val); i++) {
+      h += ptr[i];
+      h += ( h << 10 );
+      h ^= ( h >> 6 );
+   }
 
-	h += ( h << 3);
-	h ^= ( h >> 11 );
-	h += ( h >> 15 );
+   h += ( h << 3);
+   h ^= ( h >> 11 );
+   h += ( h >> 15 );
 
-	return h % htable->max_hash;
+   return h % htable->max_hash;
 }
 
 
@@ -88,19 +87,19 @@ unsigned int hash_mk_ea(hpsig_t * htable, ea_t val)
 /* description: Adds element to the hash table    */
 /*------------------------------------------------*/
 
-int hash_add_ea (hpsig_t * htable, psig_t * sig)
-{
-	int id = hash_mk_ea(htable, sig->startEA);
-	hsignature_t * hsig = NULL; 
+int hash_add_ea (hpsig_t *htable, psig_t *sig) {
+   int id = hash_mk_ea(htable, sig->startEA);
+   hsignature_t *hsig = NULL; 
 
-	hsig = (hsignature_t *)qalloc(sizeof(*hsig));
-	if (!hsig) return -1;
+   hsig = (hsignature_t *)qalloc(sizeof(*hsig));
+   if (!hsig) {
+      return -1;
+   }
+   hsig->sig = sig;
+   hsig->next = htable->table[id];
+   htable->table[id] = hsig;
 
-	hsig->sig = sig;
-	hsig->next = htable->table[id];
-	htable->table[id] = hsig;
-
-	return 0;
+   return 0;
 }
 
 
@@ -109,25 +108,23 @@ int hash_add_ea (hpsig_t * htable, psig_t * sig)
 /* description: Finds element in the hash table   */
 /*------------------------------------------------*/
 
-psig_t * hash_find_ea (hpsig_t * htable, ea_t ea)
-{
-	if (ea == BADADDR)
-		return NULL;
+psig_t *hash_find_ea (hpsig_t *htable, ea_t ea) {
+   if (ea == BADADDR) {
+      return NULL;
+   }
+   int id = hash_mk_ea(htable, ea);
+   hsignature_t *hsig;
 
-	int id = hash_mk_ea(htable, ea);
-	hsignature_t * hsig;
+   hsig = htable->table[id];
 
-	hsig = htable->table[id];
+   while (hsig != NULL) {
+      if (hsig->sig->startEA == ea) {
+         return hsig->sig;
+      }
+      hsig = hsig->next;
+   }
 
-	while (hsig != NULL)
-	{
-		if (hsig->sig->startEA == ea)
-			return hsig->sig;
-
-		hsig = hsig->next;
-	}
-
-	return NULL;
+   return NULL;
 }
 
 
@@ -136,24 +133,21 @@ psig_t * hash_find_ea (hpsig_t * htable, ea_t ea)
 /* description: Frees hash table                  */
 /*------------------------------------------------*/
 
-void hash_free (hpsig_t * htable)
-{
-	unsigned int i;
-	hsignature_t * hsig, * tmp;
+void hash_free (hpsig_t *htable) {
+   unsigned int i;
+   hsignature_t *hsig, *tmp;
 
-	for (i = 0; i < htable->max_hash; i++)
-	{
-		hsig = htable->table[i];
+   for (i = 0; i < htable->max_hash; i++) {
+      hsig = htable->table[i];
 
-		while (hsig != NULL)
-		{
-			tmp = hsig->next;
-			qfree (hsig);
+      while (hsig != NULL) {
+         tmp = hsig->next;
+         qfree (hsig);
 
-			hsig = tmp;
-		}
-	}
+         hsig = tmp;
+      }
+   }
 
-	qfree(htable);
+   qfree(htable);
 }
 

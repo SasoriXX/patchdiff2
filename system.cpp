@@ -17,17 +17,15 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "sig.hpp"
-#include "system.hpp"
-#include "options.hpp"
-#include "os.hpp"
-
+#include "sig.h"
+#include "system.h"
+#include "options.h"
+#include "os.h"
 
 // global variable to keep IPC state
 ipc_config_t ipcc;
-
 
 /*------------------------------------------------*/
 /* function : generate_idc_file                   */
@@ -36,17 +34,17 @@ ipc_config_t ipcc;
 /*              mode                              */
 /*------------------------------------------------*/
 
-static int generate_idc_file(char * file)
-{
-	FILE * fp;
+static int generate_idc_file(char *file) {
+   FILE *fp;
 
-	fp = qfopen(file, "w+");
-	if (!fp) return -1;
+   fp = qfopen(file, "w+");
+   if (!fp) {
+      return -1;
+   }
+   qfwrite(fp, PATCHDIFF_IDC, strlen(PATCHDIFF_IDC));
+   qfclose(fp);
 
-	qfwrite(fp, PATCHDIFF_IDC, strlen(PATCHDIFF_IDC));
-	qfclose(fp);
-
-	return 0;
+   return 0;
 }
 
 
@@ -55,28 +53,33 @@ static int generate_idc_file(char * file)
 /* description: Executes another IDA instance     */
 /*------------------------------------------------*/
 
-static int system_execute_second_instance(char * idc, ea_t ea, char * file, bool close, long id, void * data)
-{
-	char path[QMAXPATH*4];
-	char cmd[QMAXPATH*4];
+static int system_execute_second_instance(char *idc, ea_t ea, char *file, bool close, long id, void *data) {
+   char path[QMAXPATH*4];
+   char cmd[QMAXPATH*4];
 
-	if (!getsysfile(path, sizeof(path), IDA_EXEC, NULL))
-		return -1;
+   if (!getsysfile(path, sizeof(path), IDA_EXEC, NULL)) {
+      return -1;
+   }
 
-	if (generate_idc_file(idc))
-		return -1;
+   if (generate_idc_file(idc)) {
+      return -1;
+   }
 
-	qsnprintf(cmd, sizeof(cmd), "\"%s\" -A -S\"%s\" -Opatchdiff2:%ld:%a:%u:\"%s\" \"%s\"",
-									path,
-									idc,
-									id,
-									ea,
-									dto.graph.s_showpref,
-									idc,
-									file
-									);
+   qsnprintf(cmd, sizeof(cmd), "\"%s\" -A -S\"%s\" -Opatchdiff2:%ld:%a:%u:\"%s\" \"%s\"",
+                           path,
+                           idc,
+                           id,
+                           ea,
+#if IDA_SDK_VERSION < 700
+                           dto.graph.s_showpref,
+#else
+                           0,  // dto went away in 7.0, not clear how to replicate above
+#endif
+                           idc,
+                           file
+                           );
 
-	return os_execute_command(cmd, close, data);
+   return os_execute_command(cmd, close, data);
 }
 
 
@@ -86,45 +89,39 @@ static int system_execute_second_instance(char * idc, ea_t ea, char * file, bool
 /*              between 2 IDA instances           */
 /*------------------------------------------------*/
 
-bool ipc_init(char * file, int type, long id)
-{
-	bool ret;
-	long pid;
-	char tmpname[QMAXPATH];
+bool ipc_init(char *file, int type, long id) {
+   bool ret;
+   long pid;
+   char tmpname[QMAXPATH];
 
-	if (type == 0)
-	{
-		ipcc.init = false;
-		ipcc.data = NULL;
-	}
-	else if (!ipcc.init)
-	{
-		if (type == 1)
-		{
+   if (type == 0) {
+      ipcc.init = false;
+      ipcc.data = NULL;
+   }
+   else if (!ipcc.init) {
+      if (type == 1) {
+         pid = os_get_pid();
+         ret = os_ipc_init(&ipcc.data, pid, IPC_SERVER);
+         if (!ret) {
+            return false;
+         }
+         os_tempnam(tmpname, sizeof(tmpname), ".idc");
+         if (system_execute_second_instance(tmpname, BADADDR, file, false, pid, ipcc.data) != 0) {
+            ipc_close();
+            return false;
+         }
+      }
+      else {
+         ret = os_ipc_init(&ipcc.data, id, IPC_CLIENT);
+         if (!ret) {
+            return false;
+         }
+      }
 
-			pid = os_get_pid();
-			ret = os_ipc_init(&ipcc.data, pid, IPC_SERVER);
-			if (!ret)
-				return false;
+      ipcc.init = true;
+   }
 
-			os_tempnam(tmpname, sizeof(tmpname), ".idc");
-			if (system_execute_second_instance(tmpname, BADADDR, file, false, pid, ipcc.data) != 0)
-			{
-				ipc_close();
-				return false;
-			}
-		}
-		else
-		{
-			ret = os_ipc_init(&ipcc.data, id, IPC_CLIENT);
-			if (!ret)
-				return false;
-		}
-
-		ipcc.init = true;
-	}
-
-	return true;
+   return true;
 }
 
 
@@ -134,14 +131,15 @@ bool ipc_init(char * file, int type, long id)
 /*              between 2 IDA instances           */
 /*------------------------------------------------*/
 
-void ipc_close()
-{
-	if (!ipcc.init) return;
+void ipc_close() {
+   if (!ipcc.init) {
+      return;
+   }
 
-	os_ipc_close(ipcc.data);
+   os_ipc_close(ipcc.data);
 
-	ipcc.data = NULL;
-	ipcc.init = false;
+   ipcc.data = NULL;
+   ipcc.init = false;
 }
 
 
@@ -151,20 +149,21 @@ void ipc_close()
 /*              IDA instance                      */
 /*------------------------------------------------*/
 
-static bool ipc_send_cmd(char * cmd)
-{
-	idata_t d;
+static bool ipc_send_cmd(char *cmd) {
+   idata_t d;
 
-	d.cmd = IPC_DATA;
-	qstrncpy(d.data, cmd, sizeof(d.data));
+   d.cmd = IPC_DATA;
+   qstrncpy(d.data, cmd, sizeof(d.data));
 
-	if (!os_ipc_send(ipcc.data, IPC_SERVER, &d))
-		return false;
+   if (!os_ipc_send(ipcc.data, IPC_SERVER, &d)) {
+      return false;
+   }
 
-	if (!os_ipc_recv(ipcc.data, IPC_SERVER, &d) || d.cmd != IPC_DONE)
-		return false;
+   if (!os_ipc_recv(ipcc.data, IPC_SERVER, &d) || d.cmd != IPC_DONE) {
+      return false;
+   }
 
-	return true;
+   return true;
 }
 
 
@@ -174,28 +173,30 @@ static bool ipc_send_cmd(char * cmd)
 /* description: Receives command to execute       */
 /*------------------------------------------------*/
 
-bool ipc_recv_cmd(char * buf, size_t blen)
-{
-	bool ret;
-	idata_t d;
-	size_t len;
+bool ipc_recv_cmd(char *buf, size_t blen) {
+   bool ret;
+   idata_t d;
+   size_t len;
 
-	memset(d.data, '\0', sizeof(d.data));
+   memset(d.data, '\0', sizeof(d.data));
 
-	ret = os_ipc_recv(ipcc.data, IPC_CLIENT, &d);
-	if (!ret)
-		return false;
+   ret = os_ipc_recv(ipcc.data, IPC_CLIENT, &d);
+   if (!ret) {
+      return false;
+   }
 
-	if (d.cmd != IPC_DATA)
-		return false;
+   if (d.cmd != IPC_DATA) {
+      return false;
+   }
 
-	len = strlen(d.data) + 1;
-	if (len > blen)
-		len = blen;
+   len = strlen(d.data) + 1;
+   if (len > blen) {
+      len = blen;
+   }
 
-	memcpy(buf, d.data, len);
+   memcpy(buf, d.data, len);
 
-	return true;
+   return true;
 }
 
 
@@ -204,13 +205,12 @@ bool ipc_recv_cmd(char * buf, size_t blen)
 /* description: Acknowledges end of command       */
 /*------------------------------------------------*/
 
-bool ipc_recv_cmd_end()
-{
-	idata_t d;
+bool ipc_recv_cmd_end() {
+   idata_t d;
 
-	d.cmd = IPC_DONE;
+   d.cmd = IPC_DONE;
 
-	return os_ipc_send(ipcc.data, IPC_CLIENT, &d);
+   return os_ipc_send(ipcc.data, IPC_CLIENT, &d);
 }
 
 
@@ -220,21 +220,25 @@ bool ipc_recv_cmd_end()
 /*              instance                          */
 /*------------------------------------------------*/
 
-static void ipc_execute_second_instance(char * idc, ea_t ea, char * file)
-{
-	char cmd[QMAXPATH*4];
+static void ipc_execute_second_instance(char *idc, ea_t ea, char *file) {
+   char cmd[QMAXPATH*4];
 
-	if (!ipc_init(file, 1, 0))
-		return;
+   if (!ipc_init(file, 1, 0)) {
+      return;
+   }
 
-	qsnprintf(cmd, sizeof(cmd), "%u:%a:%u:%s",
-									0,
-									ea,
-									dto.graph.s_showpref,
-									idc
-									);
+   qsnprintf(cmd, sizeof(cmd), "%u:%a:%u:%s",
+                           0,
+                           ea,
+#if IDA_SDK_VERSION < 700
+                           dto.graph.s_showpref,
+#else
+                           0,  // dto went away in 7.0, not clear how to replicate above
+#endif
+                           idc
+                           );
 
-	ipc_send_cmd(cmd);
+   ipc_send_cmd(cmd);
 }
 
 
@@ -244,22 +248,23 @@ static void ipc_execute_second_instance(char * idc, ea_t ea, char * file)
 /*              another idb                       */
 /*------------------------------------------------*/
 
-slist_t * system_parse_idb(ea_t ea, char * file, options_t * opt)
-{
-	slist_t * sl = NULL;
-	char tmpname[QMAXPATH];
+slist_t *system_parse_idb(ea_t ea, char *file, options_t *opt) {
+   slist_t *sl = NULL;
+   char tmpname[QMAXPATH];
 
-	os_tempnam(tmpname, sizeof(tmpname), ".idc");
+   os_tempnam(tmpname, sizeof(tmpname), ".idc");
 
-	if (!options_use_ipc(opt))
-		system_execute_second_instance(tmpname, ea, file, true, 0, NULL);
-	else
-		ipc_execute_second_instance(tmpname, ea, file);
+   if (!options_use_ipc(opt)) {
+      system_execute_second_instance(tmpname, ea, file, true, 0, NULL);
+   }
+   else {
+      ipc_execute_second_instance(tmpname, ea, file);
+   }
 
-	sl = siglist_load(tmpname);
-	os_unlink(tmpname);
+   sl = siglist_load(tmpname);
+   os_unlink(tmpname);
 
-	return sl;
+   return sl;
 }
 
 
@@ -268,13 +273,11 @@ slist_t * system_parse_idb(ea_t ea, char * file, options_t * opt)
 /* description: Gets global system preference     */
 /*------------------------------------------------*/
 
-bool system_get_pref(const char *name, void * data, int type)
-{
-	if (type == SPREF_INT)
-	{
-		return os_get_pref_int(name, (int *)data);
-	}
+bool system_get_pref(const char *name, void *data, int type) {
+   if (type == SPREF_INT) {
+      return os_get_pref_int(name, (int *)data);
+   }
 
-	return false;
+   return false;
 }
 

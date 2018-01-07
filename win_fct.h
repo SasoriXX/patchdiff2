@@ -17,16 +17,40 @@
 */
 
 
-#ifndef __PARSER_H__
-#define __PARSER_H__
+#ifndef __WIN_FCT_H__
+#define __WIN_FCT_H__
+
+#include "system.h"
+
+#ifdef __EA64__
+#if IDA_SDK_VERSION < 700
+#define IDA_EXEC "idaq64.exe"
+#else
+#define IDA_EXEC "ida64.exe"
+#endif
+#else
+#if IDA_SDK_VERSION < 700
+#define IDA_EXEC "idaq.exe"
+#else
+#define IDA_EXEC "ida.exe"
+#endif
+#endif
 
 
-#include "sig.hpp"
-#include "options.hpp"
+// Preference functions
+bool os_get_pref_int(const char *, int *);
 
-slist_t * parse_idb();
-slist_t * parse_second_idb(char **, options_t *);
-slist_t * parse_fct(ea_t, char);
-slist_t * parse_second_fct(ea_t, char *, options_t *);
+// System functions
+int os_execute_command(char *, bool, void *);
+void os_copy_to_clipboard(char *);
+long os_get_pid();
+int os_unlink(const char *path);
+void os_tempnam(char *, size_t, char *);
+
+// Shared memory functions
+bool os_ipc_send(void *, int, idata_t *);
+bool os_ipc_recv(void *, int, idata_t *);
+bool os_ipc_init(void **, long, int);
+bool os_ipc_close(void *);
 
 #endif

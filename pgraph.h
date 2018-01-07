@@ -16,13 +16,33 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __OS_H__
-#define __OS_H__
 
-#ifdef _WINDOWS
-#include "win_fct.hpp"
-#else
-#include "unix_fct.hpp"
-#endif
+#ifndef __PGRAPH_H__
+#define __PGRAPH_H__
+
+#include "sig.h"
+
+typedef struct node_list * pnode_list;
+
+struct node_list {
+   uval_t id;
+   slist_t * sl;
+   pnode_list next;
+};
+
+typedef struct node_list nlist_t;
+
+
+struct graph_list {
+   int num;
+   nlist_t * sl;
+
+};
+
+typedef struct graph_list glist_t;
+
+
+void pgraph_display(slist_t *, slist_t *);
+void pgraph_display_one(slist_t *);
 
 #endif

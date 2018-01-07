@@ -17,16 +17,16 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "sig.hpp"
-#include "parser.hpp"
-#include "patchdiff.hpp"
-#include "diff.hpp"
-#include "backup.hpp"
-#include "display.hpp"
-#include "options.hpp"
-#include "system.hpp"
+#include "sig.h"
+#include "parser.h"
+#include "patchdiff.h"
+#include "diff.h"
+#include "backup.h"
+#include "display.h"
+#include "options.h"
+#include "system.h"
 
 extern plugin_t PLUGIN;
 extern char *exename;
@@ -35,168 +35,170 @@ deng_t * d_engine;
 cpu_t patchdiff_cpu;
 options_t * d_opt;
 
+static int idaapi init(void) {
+   if (!strcmp(inf.procName, "metapc")) {
+      if (inf.is_64bit()) {
+         patchdiff_cpu = CPU_X8664;
+      }
+      else {
+         patchdiff_cpu = CPU_X8632;
+      }
+   }
+   else if (!strcmp(inf.procName, "PPC")) {
+      patchdiff_cpu = CPU_PPC;
+   }
+   else {
+      patchdiff_cpu = CPU_DEFAULT;
+   }
 
-static int idaapi init(void)
-{
-	if (!strcmp(inf.procName, "metapc"))
-	{
-		if (inf.is_64bit())
-			patchdiff_cpu = CPU_X8664;
-		else
-			patchdiff_cpu = CPU_X8632;
-	}
-	else if (!strcmp(inf.procName, "PPC"))
-	{
-		patchdiff_cpu = CPU_PPC;
-	}
-	else
-		patchdiff_cpu = CPU_DEFAULT;
+   d_engine = NULL;
+   
+   // handle IPC
+   ipc_init(NULL, 0, 0);
 
-	d_engine = NULL;
-	
-	// handle IPC
-	ipc_init(NULL, 0, 0);
+   d_opt = options_init();
+   if (!d_opt) {
+      return PLUGIN_SKIP;
+   }
 
-	d_opt = options_init();
-	if (!d_opt)
-		return PLUGIN_SKIP;
-
-	return PLUGIN_OK;
+   return PLUGIN_OK;
 }
 
-static void idaapi term(void)
-{
-	if (d_engine)
-	{
-		if (options_save_db(d_opt))
-			backup_save_results(d_engine);
-		diff_engine_free(d_engine);
-		unhook_from_notification_point(HT_UI, ui_callback);
-	}
+static void idaapi term(void) {
+   if (d_engine) {
+      if (options_save_db(d_opt)) {
+         backup_save_results(d_engine);
+      }
+      diff_engine_free(d_engine);
+      unhook_from_notification_point(HT_UI, ui_callback);
+   }
 
-	ipc_close();
-	options_close(d_opt);
-}
-
-
-static void run_first_instance()
-{
-	char * file;
-	slist_t * sl1 = NULL;
-	slist_t * sl2 = NULL;
-	int ret;
-
-	msg ("\n---------------------------------------------------\n"
-		"PatchDiff Plugin v2.0.10\n"
-		"Copyright (c) 2010-2011, Nicolas Pouvesle\n"
-		"Copyright (C) 2007-2009, Tenable Network Security, Inc\n"
-		"---------------------------------------------------\n\n");
-
-	ret = backup_load_results(&d_engine, d_opt);
-	if (ret == 1)
-	{
-		display_results(d_engine);
-		return;
-	}
-	else if (ret == -1)
-	{
-		return;
-	}
-
-	show_wait_box ("PatchDiff is in progress ...");
-
-	msg ("Scanning for functions ...\n");
-
-	msg ("parsing second idb...\n");
-	sl2 = parse_second_idb(&file, d_opt);
-	if (!sl2)
-	{
-		msg("Error: IDB2 parsing cancelled or failed.\n");
-		hide_wait_box();
-		return;
-	}
-
-	msg ("parsing first idb...\n");
-	sl1 = parse_idb ();
-	if (!sl1)
-	{
-		msg("Error: IDB1 parsing failed.\n");
-		siglist_free(sl2);
-		hide_wait_box();
-		return;
-	}
-
-	msg ("diffing...\n");
-	generate_diff(&d_engine, sl1, sl2, file, true, d_opt);
-
-	msg ("done!\n");
-	hide_wait_box();
-
-	if (sl1) siglist_partial_free(sl1);
-	if (sl2) siglist_partial_free(sl2);
+   ipc_close();
+   options_close(d_opt);
 }
 
 
-static void run_second_instance(const char * options)
-{
-	slist_t * sl;
-	char file[QMAXPATH];
-	ea_t ea = BADADDR;
-	unsigned char opt = 0;
-	long id;
-	unsigned int v;
-	bool cont;
-	char tmp[QMAXPATH*4];
-	
-	qsscanf(options, "%lu:%a:%u:%s", &id, &ea, &v, file);
-	opt = (unsigned char)v;
-	
-	if (id)
-	{
-		if (ipc_init(file, 2, id))
-		{
-			do
-			{
-				cont = ipc_recv_cmd(tmp, sizeof(tmp));
-				if (cont)
-				{
-					run_second_instance(tmp);
-					ipc_recv_cmd_end();
-				}
+static void run_first_instance() {
+   char *file;
+   slist_t *sl1 = NULL;
+   slist_t *sl2 = NULL;
+   int ret;
 
-			}while(cont);
-		}
-	}
-	else
-	{
-		if (ea == BADADDR)
-		{
-			sl = parse_idb ();
-		}
-		else
-			sl = parse_fct(ea, opt);
+   msg ("\n---------------------------------------------------\n"
+      "PatchDiff Plugin v2.0.11\n"
+      "Copyright (c) 2010-2011, Nicolas Pouvesle\n"
+      "Copyright (C) 2007-2009, Tenable Network Security, Inc\n"
+      "Copyright (c) 2018, Chris Eagle (Updates for IDA versions >= 6.7)\n"
+      "---------------------------------------------------\n\n");
 
-		if (!sl) return;
-		
-		siglist_save(sl, file);
+   ret = backup_load_results(&d_engine, d_opt);
+   if (ret == 1) {
+      display_results(d_engine);
+      return;
+   }
+   else if (ret == -1) {
+      return;
+   }
 
-		siglist_free(sl);
-	}
+   show_wait_box("PatchDiff is in progress ...");
+
+   msg("Scanning for functions ...\n");
+
+   msg("parsing second idb...\n");
+   sl2 = parse_second_idb(&file, d_opt);
+   if (!sl2) {
+      msg("Error: IDB2 parsing cancelled or failed.\n");
+      hide_wait_box();
+      return;
+   }
+
+   msg("parsing first idb...\n");
+   sl1 = parse_idb();
+   if (!sl1) {
+      msg("Error: IDB1 parsing failed.\n");
+      siglist_free(sl2);
+      hide_wait_box();
+      return;
+   }
+
+   msg("diffing...\n");
+   generate_diff(&d_engine, sl1, sl2, file, true, d_opt);
+
+   msg("done!\n");
+   hide_wait_box();
+
+   if (sl1) {
+      siglist_partial_free(sl1);
+   }
+   if (sl2) {
+      siglist_partial_free(sl2);
+   }
 }
 
 
-static void idaapi run(int arg)
-{
-	const char * options = NULL;
+static void run_second_instance(const char * options) {
+   slist_t * sl;
+   char file[QMAXPATH];
+   ea_t ea = BADADDR;
+   unsigned char opt = 0;
+   long id;
+   unsigned int v;
+   bool cont;
+   char tmp[QMAXPATH*4];
+   
+   qsscanf(options, "%lu:%a:%u:%s", &id, &ea, &v, file);
+   opt = (unsigned char)v;
+   
+   if (id) {
+      if (ipc_init(file, 2, id)) {
+         do {
+            cont = ipc_recv_cmd(tmp, sizeof(tmp));
+            if (cont) {
+               run_second_instance(tmp);
+               ipc_recv_cmd_end();
+            }
+         } while(cont);
+      }
+   }
+   else {
+      if (ea == BADADDR) {
+         sl = parse_idb ();
+      }
+      else {
+         sl = parse_fct(ea, opt);
+      }
 
-	autoWait();
+      if (!sl) {
+         return;
+      }
+      
+      siglist_save(sl, file);
 
-	options = get_plugin_options("patchdiff2");
+      siglist_free(sl);
+   }
+}
 
-	if (options == NULL)
-		run_first_instance();
-	else
-		run_second_instance(options);
+#if IDA_SDK_VERSION < 700
+static void idaapi run(int arg) {
+#else
+static bool idaapi run(size_t arg) {
+#endif
+   const char * options = NULL;
+
+   autoWait();
+
+   options = get_plugin_options("patchdiff2");
+
+   if (options == NULL) {
+      run_first_instance();
+   }
+   else {
+      run_second_instance(options);
+   }
+
+#if IDA_SDK_VERSION >= 700
+   return true;
+#endif
 }
 
 
@@ -205,15 +207,15 @@ char help[] = "A Binary Difference Analysis plugin module\n";
 char wanted_name[] = "PatchDiff2";
 char wanted_hotkey[] = "Ctrl-8";
 
-plugin_t PLUGIN =
-{
-	IDP_INTERFACE_VERSION,
-	PLUGIN_MOD | PLUGIN_PROC,
-	init,
-	term,
-	run,
-	comment,
-	help,
-	wanted_name,
-	wanted_hotkey
+plugin_t PLUGIN = {
+   IDP_INTERFACE_VERSION,
+   PLUGIN_MOD | PLUGIN_PROC,
+   init,
+   term,
+   run,
+   comment,
+   help,
+   wanted_name,
+   wanted_hotkey
 };
+

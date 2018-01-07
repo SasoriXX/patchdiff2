@@ -20,12 +20,20 @@
 #ifndef __UNIX_FCT_H__
 #define __UNIX_FCT_H__
 
-#include "system.hpp"
+#include "system.h"
 
 #ifdef __EA64__
+#if IDA_SDK_VERSION < 700
 #define IDA_EXEC "idaq64"
 #else
+#define IDA_EXEC "ida64"
+#endif
+#else
+#if IDA_SDK_VERSION < 700
 #define IDA_EXEC "idaq"
+#else
+#define IDA_EXEC "ida"
+#endif
 #endif
 
 

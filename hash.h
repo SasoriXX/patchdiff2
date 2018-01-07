@@ -17,47 +17,33 @@
 */
 
 
-#ifndef __SYSTEM_HPP__
-#define __SYSTEM_HPP__
+#ifndef __HASH_H__
+#define __HASH_H__
 
-#include "sig.hpp"
-#include "options.hpp"
-
-#define PATCHDIFF_IDC "#include <idc.idc>\n\nstatic main (void)\n{\n	RunPlugin (\"patchdiff2\", 1);\n	Exit(1);\n}\n"
-
-#define SPREF_INT 1
-
-#define IPC_DATA 0
-#define IPC_DONE 1
-#define IPC_END  3
-
-#define IPC_SERVER 1
-#define IPC_CLIENT 2
+#include "sig.h"
 
 
-struct ipc_config
-{
-	long init;
-	void * data;
+typedef struct hsignature * phsignature;
+
+struct hsignature {
+   psig_t * sig;
+   phsignature next;
 };
 
-typedef struct ipc_config ipc_config_t;
+typedef struct hsignature hsignature_t;
 
-struct idata
-{
-	long cmd;
-	char data[256];
+struct hsig {
+   unsigned int max_hash;
+   hsignature_t ** table ;
 };
 
-typedef struct idata idata_t;
+typedef struct hsig hpsig_t;
 
 
-bool system_get_pref(const char *, void *, int);
-slist_t * system_parse_idb(ea_t, char *, options_t *);
-
-bool ipc_init(char *, int, long);
-void ipc_close();
-bool ipc_recv_cmd(char *, size_t);
-bool ipc_recv_cmd_end();
+hpsig_t * hash_init(size_t);
+unsigned int hash_mk_ea(hpsig_t *, ea_t);
+int hash_add_ea (hpsig_t *, psig_t *);
+psig_t * hash_find_ea (hpsig_t *, ea_t);
+void hash_free (hpsig_t *);
 
 #endif

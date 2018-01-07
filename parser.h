@@ -16,16 +16,17 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __PX86_H__
-#define __PX86_H__
 
-#include "precomp.hpp"
+#ifndef __PARSER_H__
+#define __PARSER_H__
 
-unsigned char x86_get_byte(ea_t);
-bool x86_remove_instr(unsigned char, ea_t);
-bool x86_is_end_block(ea_t);
-bool x86_is_direct_jump(ea_t ea);
-ea_t x86_get_fake_jump(ea_t);
-int x86_is_cond_jump_pos(ea_t);
+
+#include "sig.h"
+#include "options.h"
+
+slist_t * parse_idb();
+slist_t * parse_second_idb(char **, options_t *);
+slist_t * parse_fct(ea_t, char);
+slist_t * parse_second_fct(ea_t, char *, options_t *);
 
 #endif

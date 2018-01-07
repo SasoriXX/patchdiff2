@@ -17,34 +17,12 @@
 */
 
 
-#ifndef __PGRAPH_H__
-#define __PGRAPH_H__
+#ifndef __PPC_H__
+#define __PPC_H__
 
-#include "sig.hpp"
+#include "precomp.h"
 
-typedef struct node_list * pnode_list;
-
-struct node_list
-{
-	uval_t id;
-	slist_t * sl;
-	pnode_list next;
-};
-
-typedef struct node_list nlist_t;
-
-
-struct graph_list
-{
-	int num;
-	nlist_t * sl;
-
-};
-
-typedef struct graph_list glist_t;
-
-
-void pgraph_display(slist_t *, slist_t *);
-void pgraph_display_one(slist_t *);
+unsigned char ppc_get_byte(ea_t);
+bool ppc_remove_instr(unsigned char, ea_t);
 
 #endif

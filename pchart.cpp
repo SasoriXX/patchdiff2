@@ -17,257 +17,246 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "pchart.hpp"
-#include "patchdiff.hpp"
-#include "x86.hpp"
+#include "pchart.h"
+#include "patchdiff.h"
+#include "x86.h"
 
 using namespace std;
 
 extern cpu_t patchdiff_cpu;
 
 
-ea_t get_fake_jump(ea_t ea)
-{
-	switch(patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		return x86_get_fake_jump(ea);
-	default:
-		return BADADDR;
-	}
+ea_t get_fake_jump(ea_t ea) {
+   switch(patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      return x86_get_fake_jump(ea);
+   default:
+      return BADADDR;
+   }
 }
 
 
-bool is_end_block(ea_t ea)
-{
-	switch(patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		return x86_is_end_block(ea);
-	default:
-		return false;
-	}
+bool is_end_block(ea_t ea) {
+   switch(patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      return x86_is_end_block(ea);
+   default:
+      return false;
+   }
 }
 
-ea_t get_direct_jump(ea_t ea)
-{
-	xrefblk_t xb;
-	cref_t cr;
-	flags_t f = getFlags(ea);
-	bool b = xb.first_from(ea, XREF_FAR);
-    if (!b) return BADADDR;
-
-	cr = (cref_t)xb.type;
-	if (!xb.iscode || !(cr == fl_JF || cr == fl_JN || cr == fl_F) || (f & FF_JUMP)) return BADADDR;
-
-	switch(patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		if (x86_is_direct_jump(ea)) return xb.to;
-	default:
-		return BADADDR;
-	}
-}
-
-
-bool pflow_chart_t::getJump(func_t * fct, qvector<ea_t> & list, pbasic_block_t & bl)
-{
-	xrefblk_t xb;
-	cref_t cr;
-	bool b, j, flow;
-	qvector<pedge_t> tmp;
-	qvector<pedge_t>::iterator pos;
-	ea_t tea, ea = bl.endEA, end, jaddr;
-	flags_t f;
-	size_t k;
-	int type = 0;
-	int cond;
-
-	j = flow = false;
-
-	end = get_item_end(ea);
-
-	b = xb.first_from(ea, XREF_ALL);
-	f = getFlags(ea);
-	cond = x86_is_cond_jump_pos(ea);
-
-	while (b)
-	{
-		cr = (cref_t)xb.type;
-		if (xb.iscode && (cr == fl_JF || cr == fl_JN || cr == fl_F))
-		{
-			pedge_t ed;
-
-			if (cr == fl_JF || cr == fl_JN) {
-				j = true;
-				type = 1;
-			} else if (! (f & FF_JUMP)) {
-				flow = true;
-				type = 2;
-			} else {
-				flow = false;
-				type = 3;
-			}
-
-			if (patchdiff_cpu == CPU_X8632 || patchdiff_cpu == CPU_X8664 || get_func_chunknum(fct, xb.to) >= 0)
-			{
-				jaddr = get_direct_jump(xb.to);
-				if (jaddr == BADADDR)
-					ed.ea = xb.to;
-				else
-					ed.ea = jaddr;
-
-				ed.type = type;
-
-				pos = tmp.end();
-
-				if (patchdiff_cpu == CPU_X8632 || patchdiff_cpu == CPU_X8664)
-				{
-					if ( (cond == 1 && cr == fl_F) || (cond == 2 && cr != fl_F) )
-						pos = tmp.begin();
-				}
-				else if (ed.ea == end)
-					pos = tmp.begin();
-
-				// TODO: We hit this assert.
-				assert(ed.type != 0);
-				
-				tmp.insert(pos, ed);
-			}
-		}
-
-		b = xb.next_from();
-	}
-
-	tea = get_fake_jump(ea);
-	if (tea != BADADDR)
-	{
-		pedge_t ed;
-
-		j = true;
-		ed.ea = tea;
-		ed.type = 1;
-	}
-
-	if (j)
-	{
-		for (k=0; k<tmp.size(); k++)
-		{
-			pedge_t ed;
-
-			ed.ea = tmp[k].ea;
-			if (flow)
-				ed.type = tmp[k].type;
-			else
-				ed.type = 3;
-
-			if (xb.to != bl.startEA)
-				list.push_back(tmp[k].ea);
-
-			bl.succ.push_back(ed);
-		}
-
-		return true;
-	}
-
-	return false;
+ea_t get_direct_jump(ea_t ea) {
+   xrefblk_t xb;
+   cref_t cr;
+   flags_t f = getFlags(ea);
+   bool b = xb.first_from(ea, XREF_FAR);
+   if (!b) {
+      return BADADDR;
+   }
+   cr = (cref_t)xb.type;
+   if (!xb.iscode || !(cr == fl_JF || cr == fl_JN || cr == fl_F) || (f & FF_JUMP)) {
+      return BADADDR;
+   }
+   switch(patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      if (x86_is_direct_jump(ea)) {
+         return xb.to;
+      }
+   default:
+      return BADADDR;
+   }
 }
 
 
-bool pflow_chart_t::check_address(ea_t ea)
-{
-	qvector<pbasic_block_t>::iterator it;
+bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & bl) {
+   xrefblk_t xb;
+   cref_t cr;
+   bool b, j, flow;
+   qvector<pedge_t> tmp;
+   qvector<pedge_t>::iterator pos;
+   ea_t tea, ea = bl.endEA, end, jaddr;
+   flags_t f;
+   size_t k;
+   int type = 0;
+   int cond;
 
-	for (it=blocks.begin(); it<blocks.end(); it++)
-	{
-		if (it->startEA == ea)
-			return true;
+   j = flow = false;
 
-		if (ea > it->startEA && ea < it->endEA)
-		{
-			pbasic_block_t bl;
-			pedge_t ed;
+   end = get_item_end(ea);
 
-			bl.startEA = ea;
-			bl.endEA = it->endEA;
-			bl.succ = it->succ;
+   b = xb.first_from(ea, XREF_ALL);
+   f = getFlags(ea);
+   cond = x86_is_cond_jump_pos(ea);
 
-			it->endEA = ea;
-			it->succ.clear();
+   while (b) {
+      cr = (cref_t)xb.type;
+      if (xb.iscode && (cr == fl_JF || cr == fl_JN || cr == fl_F)) {
+         pedge_t ed;
 
-			ed.ea = ea;
-			ed.type = 3;
-			it->succ.push_back(ed);
+         if (cr == fl_JF || cr == fl_JN) {
+            j = true;
+            type = 1;
+         }
+         else if (! (f & FF_JUMP)) {
+            flow = true;
+            type = 2;
+         }
+         else {
+            flow = false;
+            type = 3;
+         }
 
-			blocks.push_back(bl);
+         if (patchdiff_cpu == CPU_X8632 || patchdiff_cpu == CPU_X8664 || get_func_chunknum(fct, xb.to) >= 0) {
+            jaddr = get_direct_jump(xb.to);
+            if (jaddr == BADADDR) {
+               ed.ea = xb.to;
+            }
+            else {
+               ed.ea = jaddr;
+            }
+            ed.type = type;
 
-			return true;
-		}
-	}
+            pos = tmp.end();
 
+            if (patchdiff_cpu == CPU_X8632 || patchdiff_cpu == CPU_X8664) {
+               if ( (cond == 1 && cr == fl_F) || (cond == 2 && cr != fl_F) ) {
+                  pos = tmp.begin();
+               }
+            }
+            else if (ed.ea == end) {
+               pos = tmp.begin();
+            }
 
-	return false;
+            // TODO: We hit this assert.
+            assert(ed.type != 0);
+            
+            tmp.insert(pos, ed);
+         }
+      }
+
+      b = xb.next_from();
+   }
+
+   tea = get_fake_jump(ea);
+   if (tea != BADADDR) {
+      pedge_t ed;
+
+      j = true;
+      ed.ea = tea;
+      ed.type = 1;
+   }
+
+   if (j) {
+      for (k=0; k<tmp.size(); k++) {
+         pedge_t ed;
+
+         ed.ea = tmp[k].ea;
+         if (flow) {
+            ed.type = tmp[k].type;
+         }
+         else {
+            ed.type = 3;
+         }
+         if (xb.to != bl.startEA) {
+            list.push_back(tmp[k].ea);
+         }
+         bl.succ.push_back(ed);
+      }
+
+      return true;
+   }
+
+   return false;
 }
 
 
-pflow_chart_t::pflow_chart_t(func_t * fct)
-{
-	ea_t ea;
-	qvector<ea_t> to_trace;
-	bool cont;
-	flags_t f;
+bool pflow_chart_t::check_address(ea_t ea) {
+   qvector<pbasic_block_t>::iterator it;
 
-	to_trace.push_back(fct->startEA);
+   for (it = blocks.begin(); it < blocks.end(); it++) {
+      if (it->startEA == ea) {
+         return true;
+      }
+      if (ea > it->startEA && ea < it->endEA) {
+         pbasic_block_t bl;
+         pedge_t ed;
 
-	while (!to_trace.empty())
-	{
-		ea = to_trace.front();
-		to_trace.erase(to_trace.begin());
+         bl.startEA = ea;
+         bl.endEA = it->endEA;
+         bl.succ = it->succ;
 
-		if (check_address(ea))
-			continue;
+         it->endEA = ea;
+         it->succ.clear();
 
-		pbasic_block_t bl;
+         ed.ea = ea;
+         ed.type = 3;
+         it->succ.push_back(ed);
 
-		bl.startEA = ea;
-		bl.endEA = ea;
-		cont = true;
+         blocks.push_back(bl);
 
-		while(cont)
-		{
-			ea = bl.endEA;
-			f = getFlags(ea);
+         return true;
+      }
+   }
 
-			if ( (!isFlow(f) && (ea != bl.startEA)) || !isCode(f) )
-				break;
 
-			if ( check_address(ea) )
-			{
-				pedge_t ed;
+   return false;
+}
 
-				ed.ea = ea;
-				ed.type = 3;
 
-				bl.succ.push_back(ed);
-				break;
-			}
+pflow_chart_t::pflow_chart_t(func_t *fct) {
+   ea_t ea;
+   qvector<ea_t> to_trace;
+   bool cont;
+   flags_t f;
 
-			if ( getJump(fct, to_trace, bl) )
-				cont = false;
+   to_trace.push_back(fct->startEA);
 
-			if ( is_end_block(ea) )
-				break;
+   while (!to_trace.empty()) {
+      ea = to_trace.front();
+      to_trace.erase(to_trace.begin());
 
-			bl.endEA = get_item_end(ea);
-		}
+      if (check_address(ea)) {
+         continue;
+      }
+      pbasic_block_t bl;
 
-		blocks.push_back(bl);
-	}
+      bl.startEA = ea;
+      bl.endEA = ea;
+      cont = true;
 
-	nproper = blocks.size();
+      while(cont) {
+         ea = bl.endEA;
+         f = getFlags(ea);
+
+         if ( (!isFlow(f) && (ea != bl.startEA)) || !isCode(f) ) {
+            break;
+         }
+         if ( check_address(ea) ) {
+            pedge_t ed;
+
+            ed.ea = ea;
+            ed.type = 3;
+
+            bl.succ.push_back(ed);
+            break;
+         }
+
+         if ( getJump(fct, to_trace, bl) ) {
+            cont = false;
+         }
+         if ( is_end_block(ea) ) {
+            break;
+         }
+         bl.endEA = get_item_end(ea);
+      }
+
+      blocks.push_back(bl);
+   }
+
+   nproper = blocks.size();
 }

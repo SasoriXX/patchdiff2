@@ -17,12 +17,16 @@
 */
 
 
-#ifndef __PPC_H__
-#define __PPC_H__
+#ifndef __WIN_FCT_H__
+#define __WIN_FCT_H__
 
-#include "precomp.hpp"
+#include "sig.h"
+#include "hash.h"
 
-unsigned char ppc_get_byte(ea_t);
-bool ppc_remove_instr(unsigned char, ea_t);
+clist_t * clist_init(slist_t *);
+int clist_insert(clist_t *, psig_t *);
+clist_t * clist_init_from_refs(hpsig_t *, frefs_t *);
+void clist_remove(clist_t *, dpsig_t *);
+void clist_reset(clist_t *);
 
 #endif

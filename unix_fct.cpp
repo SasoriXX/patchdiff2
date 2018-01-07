@@ -25,17 +25,16 @@
 #include <ida.hpp>
 #include <kernwin.hpp>
 
-#include "unix_fct.hpp"
-#include "system.hpp"
+#include "unix_fct.h"
+#include "system.h"
 
 
-struct ipc_data
-{
-  int spipe;
-  int rpipe;
-  char *sname;
-  char *rname;
-  pid_t pid;
+struct ipc_data {
+   int spipe;
+   int rpipe;
+   char *sname;
+   char *rname;
+   pid_t pid;
 };
 
 typedef struct ipc_data ipc_data_t;
@@ -46,14 +45,12 @@ typedef struct ipc_data ipc_data_t;
 /* description: fork/exec                         */
 /*------------------------------------------------*/
 
-pid_t create_process(char * cmd)
-{
-  pid_t pid;
-  char *argv[4];
+pid_t create_process(char *cmd) {
+   pid_t pid;
+   char *argv[4];
 
-  pid = fork();
-  if (pid == 0)
-    {
+   pid = fork();
+   if (pid == 0) {
       // Assume execvp is safe to call with const char strings
       argv[0] = const_cast<char*>("/bin/sh");
       argv[1] = const_cast<char*>("-c");
@@ -62,9 +59,9 @@ pid_t create_process(char * cmd)
 
       execvp(argv[0], argv);
       exit(EXIT_FAILURE);
-    }
+   }
 
-  return pid;
+   return pid;
 }
 
 
@@ -74,26 +71,27 @@ pid_t create_process(char * cmd)
 /*              new process                       */
 /*------------------------------------------------*/
 
-int os_execute_command(char * cmd, bool close, void * data)
-{
-  ipc_data_t * id = (ipc_data_t *)data;
-  int ret = -1;
-  int status;
-  pid_t pid;
-
-  pid = create_process(cmd);
-  if (pid == -1) return -1;
-
-  if (close)
-    {
+int os_execute_command(char *cmd, bool close, void *data) {
+   ipc_data_t *id = (ipc_data_t *)data;
+   int ret = -1;
+   int status;
+   pid_t pid;
+ 
+   pid = create_process(cmd);
+   if (pid == -1) {
+      return -1;
+   }
+   if (close) {
       /* we wait until the process finished (IE: sig file is generated) */
-      if (waitpid(pid, &status, 0) == -1)
-	return -1;
-    }
-  else
-    id->pid = pid;
-
-  return 0;
+      if (waitpid(pid, &status, 0) == -1) {
+         return -1;
+      }
+   }
+   else {
+      id->pid = pid;
+   }
+ 
+   return 0;
 }
 
 
@@ -102,12 +100,11 @@ int os_execute_command(char * cmd, bool close, void * data)
 /* description: checks process state              */
 /*------------------------------------------------*/
 
-bool os_check_process(pid_t pid)
-{
-  if (kill(pid, 0) == 0)
-    return true;
-
-  return false;
+bool os_check_process(pid_t pid) {
+   if (kill(pid, 0) == 0) {
+      return true;
+   }
+   return false;
 }
 
 
@@ -116,8 +113,7 @@ bool os_check_process(pid_t pid)
 /* description: Copies data to clipboard          */
 /*------------------------------------------------*/
 
-void os_copy_to_clipboard(char * data)
-{
+void os_copy_to_clipboard(char *data) {
 }
 
 
@@ -126,9 +122,8 @@ void os_copy_to_clipboard(char * data)
 /* description: Returns process ID                */
 /*------------------------------------------------*/
 
-long os_get_pid()
-{
-  return (long)getpid();
+long os_get_pid() {
+   return (long)getpid();
 }
 
 
@@ -137,9 +132,8 @@ long os_get_pid()
 /* description: removes a link to a file          */
 /*------------------------------------------------*/
 
-int os_unlink(const char * path)
-{
-  return unlink(path);
+int os_unlink(const char *path) {
+   return unlink(path);
 }
 
 
@@ -148,14 +142,13 @@ int os_unlink(const char * path)
 /* description: returns a temporary file name     */
 /*------------------------------------------------*/
 
-void os_tempnam(char *data, size_t size, const char *suffix)
-{
-	char *str = strdup(P_tmpdir "patchdiff2-XXXXXX");;
+void os_tempnam(char *data, size_t size, const char *suffix) {
+   char *str = strdup(P_tmpdir "patchdiff2-XXXXXX");;
 
-	// TODO: Just use mktemp and don't mind the lack of extension
-	char *tempname = mktemp(str);
-	qsnprintf(data, size, "%s%s", tempname, suffix);
-	free(tempname);
+   // TODO: Just use mktemp and don't mind the lack of extension
+   char *tempname = mktemp(str);
+   qsnprintf(data, size, "%s%s", tempname, suffix);
+   free(tempname);
 }
 
 
@@ -164,15 +157,15 @@ void os_tempnam(char *data, size_t size, const char *suffix)
 /* description: Sends data on pipe                */
 /*------------------------------------------------*/
 
-bool os_ipc_send(void * data, int type, idata_t * d)
-{
-  ipc_data_t * id = (ipc_data_t *)data;
-  ssize_t num;
+bool os_ipc_send(void *data, int type, idata_t *d) {
+   ipc_data_t *id = (ipc_data_t *)data;
+   ssize_t num;
 
-  num = write(id->spipe, d, sizeof(*d));
-  if (num > 0) return true;
-
-  return false;
+   num = write(id->spipe, d, sizeof(*d));
+   if (num > 0) {
+      return true;
+   }
+   return false;
 }
 
 
@@ -181,50 +174,48 @@ bool os_ipc_send(void * data, int type, idata_t * d)
 /* description: Receives data on pipe             */
 /*------------------------------------------------*/
 
-bool os_ipc_recv(void * data, int type, idata_t * d)
-{
-  ipc_data_t * id = (ipc_data_t *)data;
-  fd_set rfds, efds;
-  struct timeval tv;
-  int ret;
-
-  tv.tv_sec = 0;
-  tv.tv_usec = 1000;
-
-  if (id->pid)
-    {
-      while (1)
-	{
-	  FD_ZERO(&rfds);
-	  FD_SET(id->rpipe, &rfds);
-
-	  FD_ZERO(&efds);
-	  FD_SET(id->rpipe, &efds);
-
-	  ret = select(id->rpipe+1, &rfds, NULL, &efds, &tv);
-	  if (ret > 0 && FD_ISSET(id->rpipe, &rfds))
-	    break;
-
-	  if (ret < 0 || (ret > 0 && FD_ISSET(id->rpipe, &efds)) || !os_check_process(id->pid))
-	    return false;
-	}
-    }
-  else
-    {
-      FD_ZERO(&rfds);
-      FD_SET(id->rpipe, &rfds);
-
-      FD_ZERO(&efds);
-      FD_SET(id->rpipe, &efds);
-
-      ret = select(id->rpipe+1, &rfds, NULL, &efds, NULL);
-      if (!(ret > 0 && FD_ISSET(id->rpipe, &rfds)))
-	return false;
-    }
-
-  read(id->rpipe, d, sizeof(*d));
-
-  return true;
+bool os_ipc_recv(void *data, int type, idata_t *d) {
+   ipc_data_t *id = (ipc_data_t *)data;
+   fd_set rfds, efds;
+   struct timeval tv;
+   int ret;
+ 
+   tv.tv_sec = 0;
+   tv.tv_usec = 1000;
+ 
+   if (id->pid) {
+      while (1) {
+         FD_ZERO(&rfds);
+         FD_SET(id->rpipe, &rfds);
+    
+         FD_ZERO(&efds);
+         FD_SET(id->rpipe, &efds);
+    
+         ret = select(id->rpipe + 1, &rfds, NULL, &efds, &tv);
+         if (ret > 0 && FD_ISSET(id->rpipe, &rfds)) {
+            break;
+         }
+         if (ret < 0 || (ret > 0 && FD_ISSET(id->rpipe, &efds)) || !os_check_process(id->pid)) {
+            return false;
+         }
+      }
+   }
+   else {
+       FD_ZERO(&rfds);
+       FD_SET(id->rpipe, &rfds);
+ 
+       FD_ZERO(&efds);
+       FD_SET(id->rpipe, &efds);
+ 
+       ret = select(id->rpipe + 1, &rfds, NULL, &efds, NULL);
+       if (!(ret > 0 && FD_ISSET(id->rpipe, &rfds))) {
+          return false;
+         }
+   }
+ 
+   read(id->rpipe, d, sizeof(*d));
+ 
+   return true;
 }
 
 
@@ -233,51 +224,58 @@ bool os_ipc_recv(void * data, int type, idata_t * d)
 /* description: Inits interprocess communication  */
 /*------------------------------------------------*/
 
-bool os_ipc_init(void ** data, long pid, int type)
-{
-  char sname[512];
-  char rname[512];
-  ipc_data_t * id;
-
-  id = (ipc_data_t *)qalloc(sizeof(*id));
-  if (!id)
-    return false;
-
-  memset(id, '\0', sizeof(*id));
-	
-  qsnprintf(sname, sizeof(sname), "/tmp/pdiff2spipe%ld", pid);
-  qsnprintf(rname, sizeof(rname), "/tmp/pdiff2rpipe%ld", pid);
-
-  id->sname = qstrdup(sname);
-  id->rname = qstrdup(rname);
-
-  if (type == IPC_SERVER)
-    {
+bool os_ipc_init(void ** data, long pid, int type) {
+   char sname[512];
+   char rname[512];
+   ipc_data_t *id;
+ 
+   id = (ipc_data_t *)qalloc(sizeof(*id));
+   if (!id) {
+      return false;
+   }
+   memset(id, '\0', sizeof(*id));
+    
+   qsnprintf(sname, sizeof(sname), "/tmp/pdiff2spipe%ld", pid);
+   qsnprintf(rname, sizeof(rname), "/tmp/pdiff2rpipe%ld", pid);
+ 
+   id->sname = qstrdup(sname);
+   id->rname = qstrdup(rname);
+ 
+   if (type == IPC_SERVER) {
       mkfifo(sname, 0666);
       id->spipe = open(sname, O_RDWR|O_NONBLOCK);
-      if (id->spipe == -1) goto error;
-
+      if (id->spipe == -1) {
+         goto error;
+      }
       mkfifo(rname, 0666);
       id->rpipe = open(rname, O_RDWR|O_NONBLOCK);
-      if (id->rpipe == -1) goto error;
-    }
-  else
-    {
+      if (id->rpipe == -1) {
+         goto error;
+      }
+   }
+   else {
       id->spipe = open(rname, O_WRONLY);
-      if (id->spipe == -1) goto error;
-
+      if (id->spipe == -1) {
+         goto error;
+      }
       id->rpipe = open(sname, O_RDONLY);
-      if (id->rpipe == -1) goto error;
-    }
-
-  *data = (void *)id;
-  return true;
-
+      if (id->rpipe == -1) {
+         goto error;
+      }
+   }
+ 
+   *data = (void *)id;
+   return true;
+ 
 error:
-  if (id->spipe) close(id->spipe);
-  if (id->rpipe) close(id->rpipe);
-  qfree(id);
-  return false;
+   if (id->spipe) {
+      close(id->spipe);
+   }
+   if (id->rpipe) {
+      close(id->rpipe);
+   }
+   qfree(id);
+   return false;
 }
 
 
@@ -286,16 +284,18 @@ error:
 /* description: Closes IPC                        */
 /*------------------------------------------------*/
 
-bool os_ipc_close(void * data)
-{
-  ipc_data_t * id = (ipc_data_t *)data;
+bool os_ipc_close(void *data) {
+   ipc_data_t *id = (ipc_data_t *)data;
 
-  if (id->spipe) close(id->spipe);
-  if (id->rpipe) close(id->rpipe);
-
-  os_unlink(id->sname);
-  os_unlink(id->rname);
-  return true;
+   if (id->spipe) {
+      close(id->spipe);
+   }
+   if (id->rpipe) {
+      close(id->rpipe);
+   }
+   os_unlink(id->sname);
+   os_unlink(id->rname);
+   return true;
 }
 
 
@@ -304,8 +304,7 @@ bool os_ipc_close(void * data)
 /* description: Gets system preferences (integer) */
 /*------------------------------------------------*/
 
-bool os_get_pref_int(const char *name, int * i)
-{
+bool os_get_pref_int(const char *name, int *i) {
   *i = 0;
   return false;
 }

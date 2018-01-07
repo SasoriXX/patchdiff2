@@ -17,14 +17,14 @@
 */
 
 
-#include "precomp.hpp"
+#include "precomp.h"
 
-#include "sig.hpp"
-#include "x86.hpp"
-#include "ppc.hpp"
-#include "patchdiff.hpp"
-#include "pchart.hpp"
-#include "os.hpp"
+#include "sig.h"
+#include "x86.h"
+#include "ppc.h"
+#include "patchdiff.h"
+#include "pchart.h"
+#include "os.h"
 
 extern cpu_t patchdiff_cpu;
 
@@ -34,28 +34,46 @@ extern cpu_t patchdiff_cpu;
 /* description: Gets function name                */
 /*------------------------------------------------*/
 
-char * pget_func_name(ea_t ea, char * buffer, size_t blen)
-{
-	char * pos;
-	char tmp[512];
+char *pget_func_name(ea_t ea, char * buffer, size_t blen) {
+   char * pos;
 
-	if (!get_func_name(ea, buffer, blen))
-		return NULL;
+#if IDA_SDK_VERSION <= 670
+   char tmp[512];
+   if (!get_func_name(ea, buffer, blen)) {
+      return NULL;
+   }
+   // make sure this is not a c++ class/struct badly defined as a function
+   demangle_name(tmp, blen, buffer, inf.long_demnames);
+   if ( (strstr(tmp, "public: static") || strstr(tmp, "private: static")) &&
+      (!strstr(tmp, "(") || strstr(tmp, "public: static long (__stdcall")) ) {
+      return NULL;
+   }
+   demangle_name(buffer, blen, buffer, inf.short_demnames);
+#else
+   qstring name;
+   qstring demangled;
+   int32 dm_res;
+   if (get_func_name2(&name, ea) == 0) {
+      return NULL;
+   }
+   qstrncpy(buffer, name.c_str(), blen);
+   dm_res = demangle_name2(&demangled, name.c_str(), inf.long_demnames);
+   if (dm_res >= 0) {
+      if ( (demangled.find("public: static") != -1 || demangled.find("private: static") != -1) &&
+         (demangled.find("(") == -1 || demangled.find("public: static long (__stdcall") == -1) ) {
+          return NULL;
+      }
+      dm_res = demangle_name2(&demangled, name.c_str(), inf.short_demnames);
+      qstrncpy(buffer, demangled.c_str(), blen);
+   }
+#endif
 
-	// make sure this is not a c++ class/struct badly defined as a function
-	demangle_name(tmp, blen, buffer, inf.long_demnames);
-	if ( (strstr(tmp, "public: static") || strstr(tmp, "private: static")) &&
-		(!strstr(tmp, "(") || strstr(tmp, "public: static long (__stdcall")) )
-		 return NULL;
-
-	demangle_name(buffer, blen, buffer, inf.short_demnames);
-
-	// remove duplicates of the same name
-	pos = strstr(buffer, "Z$0");
-	if (pos)
-		pos[0] = '\0';
-
-	return buffer;
+   // remove duplicates of the same name
+   pos = strstr(buffer, "Z$0");
+   if (pos) {
+      pos[0] = '\0';
+   }
+   return buffer;
 }
 
 
@@ -65,20 +83,19 @@ char * pget_func_name(ea_t ea, char * buffer, size_t blen)
 /*              function signature                */
 /*------------------------------------------------*/
 
-psig_t * sig_init()
-{
-	psig_t * sig;
+psig_t *sig_init() {
+   psig_t * sig;
 
-	sig = (psig_t *)qalloc(sizeof(*sig));
-	if (!sig)
-		return NULL;
+   sig = (psig_t *)qalloc(sizeof(*sig));
+   if (!sig) {
+      return NULL;
+   }
+   memset(sig, 0, sizeof(*sig));
 
-	memset(sig, 0, sizeof(*sig));
+   sig->mtype = DIFF_UNMATCHED;
+   sig->msig = NULL;
 
-	sig->mtype = DIFF_UNMATCHED;
-	sig->msig = NULL;
-
-	return sig;
+   return sig;
 }
 
 
@@ -87,19 +104,17 @@ psig_t * sig_init()
 /* description: Frees chained list                */
 /*------------------------------------------------*/
 
-void frefs_free(frefs_t * frefs)
-{
-	fref_t * fref, * next;
+void frefs_free(frefs_t *frefs) {
+   fref_t * fref, * next;
 
-	fref = frefs->list;
-	while (fref)
-	{
-		next = fref->next;
-		qfree(fref);
-		fref = next;
-	}
+   fref = frefs->list;
+   while (fref) {
+      next = fref->next;
+      qfree(fref);
+      fref = next;
+   }
 
-	qfree(frefs);
+   qfree(frefs);
 }
 
 
@@ -108,18 +123,16 @@ void frefs_free(frefs_t * frefs)
 /* description: Frees chained list                */
 /*------------------------------------------------*/
 
-void dsig_free(dpsig_t * ds)
-{
-	dpsig_t * next;
+void dsig_free(dpsig_t *ds) {
+   dpsig_t * next;
 
-	while (ds)
-	{
-		next = ds->next;
-		qfree(ds);
-		ds = next;
-	}
+   while (ds) {
+      next = ds->next;
+      qfree(ds);
+      ds = next;
+   }
 
-	qfree(ds);
+   qfree(ds);
 }
 
 
@@ -128,12 +141,11 @@ void dsig_free(dpsig_t * ds)
 /* description: Frees clist_t structure           */
 /*------------------------------------------------*/
 
-void clist_free(clist_t * cl)
-{
-	dsig_free(cl->sigs);
-	dsig_free(cl->msigs);
+void clist_free(clist_t *cl) {
+   dsig_free(cl->sigs);
+   dsig_free(cl->msigs);
 
-	qfree(cl);
+   qfree(cl);
 }
 
 
@@ -142,24 +154,25 @@ void clist_free(clist_t * cl)
 /* description: Frees signature                   */
 /*------------------------------------------------*/
 
-void sig_free(psig_t * sig)
-{
-	if (sig->name)
-	{
-		qfree(sig->name);
-		sig->name = NULL;
-	}
+void sig_free(psig_t *sig) {
+   if (sig->dl.lines != NULL) {
+      qfree(sig->dl.lines);
+   }
 
-	if (sig->dl.lines != NULL)
-		qfree(sig->dl.lines);
+   if (sig->prefs) {
+      frefs_free(sig->prefs);
+   }
+   if (sig->srefs) {
+      frefs_free(sig->srefs);
+   }
+   if (sig->cp) {
+      clist_free(sig->cp);
+   }
+   if (sig->cs) {
+      clist_free(sig->cs);
+   }
 
-
-	if (sig->prefs) frefs_free(sig->prefs);
-	if (sig->srefs) frefs_free(sig->srefs);
-	if (sig->cp) clist_free(sig->cp);
-	if (sig->cs) clist_free(sig->cs);
-
-	qfree(sig);
+   qfree(sig);
 }
 
 
@@ -168,9 +181,12 @@ void sig_free(psig_t * sig)
 /* description: Sets function signature name      */
 /*------------------------------------------------*/
 
-void sig_set_name(psig_t * sig, const char * name)
-{
-	sig->name = qstrdup(name);
+void sig_set_name(psig_t *sig, const char *name) {
+   sig->name = name;
+}
+
+void sig_set_name(psig_t *sig, const qstring &name) {
+   sig->name = name;
 }
 
 
@@ -179,9 +195,8 @@ void sig_set_name(psig_t * sig, const char * name)
 /* description: Sets function start address       */
 /*------------------------------------------------*/
 
-void sig_set_start(psig_t * sig, ea_t ea)
-{
-	sig->startEA = ea;
+void sig_set_start(psig_t *sig, ea_t ea) {
+   sig->startEA = ea;
 }
 
 
@@ -190,9 +205,8 @@ void sig_set_start(psig_t * sig, ea_t ea)
 /* description: Returns function start address    */
 /*------------------------------------------------*/
 
-ea_t sig_get_start(psig_t * sig)
-{
-	return sig->startEA;
+ea_t sig_get_start(psig_t *sig) {
+   return sig->startEA;
 }
 
 
@@ -201,9 +215,8 @@ ea_t sig_get_start(psig_t * sig)
 /* description: Returns signature pred xrefs      */
 /*------------------------------------------------*/
 
-frefs_t * sig_get_preds(psig_t * sig)
-{
-	return sig->prefs;
+frefs_t *sig_get_preds(psig_t *sig) {
+   return sig->prefs;
 }
 
 
@@ -212,9 +225,8 @@ frefs_t * sig_get_preds(psig_t * sig)
 /* description: Returns signature succ xrefs      */
 /*------------------------------------------------*/
 
-frefs_t * sig_get_succs(psig_t * sig)
-{
-	return sig->srefs;
+frefs_t *sig_get_succs(psig_t *sig) {
+   return sig->srefs;
 }
 
 
@@ -223,15 +235,14 @@ frefs_t * sig_get_succs(psig_t * sig)
 /* description: Returns signature cxrefs          */
 /*------------------------------------------------*/
 
-clist_t * sig_get_crefs(psig_t * sig, int type)
-{
-	if (type == SIG_PRED)
-		return sig->cp;
-	
-	if (type == SIG_SUCC)
-		return sig->cs;
-
-	return NULL;
+clist_t *sig_get_crefs(psig_t *sig, int type) {
+   if (type == SIG_PRED) {
+      return sig->cp;
+   }
+   if (type == SIG_SUCC) {
+      return sig->cs;
+   }
+   return NULL;
 }
 
 
@@ -240,13 +251,13 @@ clist_t * sig_get_crefs(psig_t * sig, int type)
 /* description: Sets signature cxrefs             */
 /*------------------------------------------------*/
 
-void sig_set_crefs(psig_t * sig, int type, clist_t * cl)
-{
-	if (type == SIG_PRED)
-		sig->cp = cl;
-	
-	else if (type == SIG_SUCC)
-		sig->cs = cl;
+void sig_set_crefs(psig_t *sig, int type, clist_t *cl) {
+   if (type == SIG_PRED) {
+      sig->cp = cl;
+   }
+   else if (type == SIG_SUCC) {
+      sig->cs = cl;
+   }
 }
 
 
@@ -255,9 +266,8 @@ void sig_set_crefs(psig_t * sig, int type, clist_t * cl)
 /* description: Sets file number                  */
 /*------------------------------------------------*/
 
-void sig_set_nfile(psig_t * sig, int num)
-{
-	sig->nfile = num;
+void sig_set_nfile(psig_t *sig, int num) {
+   sig->nfile = num;
 }
 
 
@@ -266,18 +276,17 @@ void sig_set_nfile(psig_t * sig, int num)
 /* description: Sets matched address              */
 /*------------------------------------------------*/
 
-void sig_set_matched_sig(psig_t * sig, psig_t * sig2, int type)
-{
-	sig->msig = sig2;
-	sig->matchedEA = sig2->startEA;
+void sig_set_matched_sig(psig_t *sig, psig_t *sig2, int type) {
+   sig->msig = sig2;
+   sig->matchedEA = sig2->startEA;
 
-	sig2->msig = sig;
-	sig2->matchedEA = sig->startEA;
+   sig2->msig = sig;
+   sig2->matchedEA = sig->startEA;
 
-	sig->mtype = sig2->mtype = type;
+   sig->mtype = sig2->mtype = type;
 
-	if (sig->crc_hash != sig2->crc_hash)
-		sig->id_crc = sig2->id_crc = 1;
+   if (sig->crc_hash != sig2->crc_hash)
+      sig->id_crc = sig2->id_crc = 1;
 }
 
 
@@ -286,9 +295,8 @@ void sig_set_matched_sig(psig_t * sig, psig_t * sig2, int type)
 /* description: Returns matched address           */
 /*------------------------------------------------*/
 
-psig_t * sig_get_matched_sig(psig_t * sig)
-{
-	return sig->msig;
+psig_t *sig_get_matched_sig(psig_t *sig) {
+   return sig->msig;
 }
 
 
@@ -297,9 +305,8 @@ psig_t * sig_get_matched_sig(psig_t * sig)
 /* description: Returns matched type              */
 /*------------------------------------------------*/
 
-int sig_get_matched_type(psig_t * sig)
-{
-	return sig->mtype;
+int sig_get_matched_type(psig_t *sig) {
+   return sig->mtype;
 }
 
 
@@ -309,42 +316,40 @@ int sig_get_matched_type(psig_t * sig)
 /*              signature                         */
 /*------------------------------------------------*/
 
-int sig_add_fref(frefs_t ** frefs, ea_t ea, int type, char rtype)
-{
-	fref_t * ref, * next;
+int sig_add_fref(frefs_t **frefs, ea_t ea, int type, char rtype) {
+   fref_t * ref, * next;
 
-	if (!*frefs)
-	{
-		*frefs = (frefs_t *)qalloc(sizeof(**frefs));
-		if (!*frefs) return -1;
+   if (!*frefs) {
+      *frefs = (frefs_t *)qalloc(sizeof(**frefs));
+      if (!*frefs) {
+         return -1;
+      }
+      memset(*frefs, 0, sizeof(**frefs));
+   }
+   else {
+      //don't add duplicates
+      next = (*frefs)->list;
+      while (next) {
+         if (next->ea == ea) {
+            return -1;
+         }
+         next = next->next;
+      }
+   }
 
-		memset(*frefs, 0, sizeof(**frefs));
-	}
-	else
-	{
-		//don't add duplicates
-		next = (*frefs)->list;
-		while(next)
-		{
-			if (next->ea == ea)
-				return -1;
+   ref = (fref_t *)qalloc(sizeof(*ref));
+   if (!ref) {
+      return -1;
+   }
+   ref->ea = ea;
+   ref->type = type;
+   ref->rtype = rtype;
+   ref->next = (*frefs)->list;
 
-			next = next->next;
-		}
-	}
+   (*frefs)->num++;
+   (*frefs)->list = ref;
 
-	ref = (fref_t *)qalloc(sizeof(*ref));
-	if (!ref) return -1;
-
-	ref->ea = ea;
-	ref->type = type;
-	ref->rtype = rtype;
-	ref->next = (*frefs)->list;
-
-	(*frefs)->num++;
-	(*frefs)->list = ref;
-
-	return 0;
+   return 0;
 }
 
 
@@ -354,9 +359,8 @@ int sig_add_fref(frefs_t ** frefs, ea_t ea, int type, char rtype)
 /*              signature                         */
 /*------------------------------------------------*/
 
-int sig_add_pref(psig_t * sig, ea_t ea, int type, char rtype)
-{
-	return sig_add_fref(&sig->prefs, ea, type, rtype);
+int sig_add_pref(psig_t *sig, ea_t ea, int type, char rtype) {
+   return sig_add_fref(&sig->prefs, ea, type, rtype);
 }
 
 
@@ -366,9 +370,8 @@ int sig_add_pref(psig_t * sig, ea_t ea, int type, char rtype)
 /*              signature                         */
 /*------------------------------------------------*/
 
-int sig_add_sref(psig_t * sig, ea_t ea, int type, char rtype)
-{
-	return sig_add_fref(&sig->srefs, ea, type, rtype);
+int sig_add_sref(psig_t *sig, ea_t ea, int type, char rtype) {
+   return sig_add_fref(&sig->srefs, ea, type, rtype);
 }
 
 
@@ -378,17 +381,16 @@ int sig_add_sref(psig_t * sig, ea_t ea, int type, char rtype)
 /*              ea is a jump                      */
 /*------------------------------------------------*/
 
-bool is_fake_jump(ea_t ea)
-{
-	switch(patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		if (x86_get_fake_jump(ea) != BADADDR)
-			return true;
-	default:
-		return false;
-	}
+bool is_fake_jump(ea_t ea) {
+   switch (patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      if (x86_get_fake_jump(ea) != BADADDR) {
+         return true;
+      }
+   default:
+      return false;
+   }
 }
 
 /*------------------------------------------------*/
@@ -398,17 +400,16 @@ bool is_fake_jump(ea_t ea)
 /*              in the signature                  */
 /*------------------------------------------------*/
 
-bool ignore_jump(ea_t ea)
-{
-	switch(patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		if (!x86_is_direct_jump(ea))
-			return false;
-	default:
-		return true;
-	}
+bool ignore_jump(ea_t ea) {
+   switch(patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      if (!x86_is_direct_jump(ea)) {
+         return false;
+      }
+   default:
+      return true;
+   }
 }
 
 
@@ -418,37 +419,35 @@ bool ignore_jump(ea_t ea)
 /*              ea is a jump                      */
 /*------------------------------------------------*/
 
-bool is_jump(psig_t * sig, ea_t ea, bool * call, bool * cj)
-{
-	xrefblk_t xb;
-	cref_t cr;
+bool is_jump(psig_t *sig, ea_t ea, bool *call, bool *cj) {
+   xrefblk_t xb;
+   cref_t cr;
 
-	*call = false;
-	*cj = false;
+   *call = false;
+   *cj = false;
 
-	if (xb.first_from(ea, XREF_FAR))
-	{
-		cr = (cref_t)xb.type;
-		if (xb.iscode && (cr == fl_JF || cr == fl_JN)) {
-			if (ignore_jump(ea)) {
-				return true;
-            } else {
-				*cj = true;
-            }
-        }
+   if (xb.first_from(ea, XREF_FAR)) {
+      cr = (cref_t)xb.type;
+      if (xb.iscode && (cr == fl_JF || cr == fl_JN)) {
+         if (ignore_jump(ea)) {
+            return true;
+         }
+         else {
+            *cj = true;
+         }
+      }
 
-		if (xb.iscode && (cr == fl_CF || cr == fl_CN))
-		{
-			if (sig->type == 1)
-				sig_add_sref(sig, xb.to, 0, CHECK_REF);
-
-			*call = true;
-		}
-	}
-	else
-		return is_fake_jump(ea);
-
-	return false;
+      if (xb.iscode && (cr == fl_CF || cr == fl_CN)) {
+         if (sig->type == 1) {
+            sig_add_sref(sig, xb.to, 0, CHECK_REF);
+         }
+         *call = true;
+      }
+   }
+   else {
+      return is_fake_jump(ea);
+   }
+   return false;
 }
 
 
@@ -458,18 +457,16 @@ bool is_jump(psig_t * sig, ea_t ea, bool * call, bool * cj)
 /*              ea must not be added to the sig   */
 /*------------------------------------------------*/
 
-bool remove_instr(unsigned char byte, ea_t ea)
-{
-	switch (patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		return x86_remove_instr(byte, ea);
-	case CPU_PPC:
-		return ppc_remove_instr(byte, ea);
-	default:
-		return false;
-	}
+bool remove_instr(unsigned char byte, ea_t ea) {
+   switch (patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      return x86_remove_instr(byte, ea);
+   case CPU_PPC:
+      return ppc_remove_instr(byte, ea);
+   default:
+      return false;
+   }
 }
 
 
@@ -480,27 +477,28 @@ bool remove_instr(unsigned char byte, ea_t ea)
 /*       available                                */
 /*------------------------------------------------*/
 
-char get_byte_with_optimization(ea_t ea)
-{
-	switch (patchdiff_cpu)
-	{
-	case CPU_X8632:
-	case CPU_X8664:
-		return x86_get_byte(ea);
-	case CPU_PPC:
-		return ppc_get_byte(ea);
-	default:
-		{
-			decode_insn(ea);
-			return (char)cmd.itype;
-		}
-	}
+char get_byte_with_optimization(ea_t ea) {
+   switch (patchdiff_cpu) {
+   case CPU_X8632:
+   case CPU_X8664:
+      return x86_get_byte(ea);
+   case CPU_PPC:
+      return ppc_get_byte(ea);
+   default: {
+#if IDA_SDK_VERSION >= 700
+         insn_t cmd;
+         decode_insn(&cmd, ea);
+#else
+         decode_insn(ea);
+#endif
+         return (char)cmd.itype;
+      }
+   }
 }
 
 
-unsigned long ror(unsigned long val, int r)
-{
-	return (val >> r) | (val << (32-r));
+unsigned long ror(unsigned long val, int r) {
+   return (val >> r) | (val << (32-r));
 }
 
 
@@ -509,141 +507,202 @@ unsigned long ror(unsigned long val, int r)
 /* description: Adds a disassembled line to the   */
 /*              signature                         */
 /*------------------------------------------------*/
+#if IDA_SDK_VERSION < 700
+int dline_add(dline_t *dl, ea_t ea, char options) {
+   char buf[256];
+   char tmp[256];
+   char dis[256];
+   char addr[30];
+   char *dll;
+   int len;
+   flags_t f;
 
-int dline_add(dline_t * dl, ea_t ea, char options)
-{
-	char buf[256];
-	char tmp[256];
-	char dis[256];
-	char addr[30];
-	char * dll;
-	int len;
-	flags_t f;
+   buf[0] = '\0';
 
-	buf[0] = '\0';
+   f = getFlags(ea);
+   generate_disasm_line(ea, dis, sizeof(dis));
 
-	f = getFlags(ea);
-	generate_disasm_line(ea, dis, sizeof(dis));
+   decode_insn(ea);
+   init_output_buffer(buf, sizeof(buf));
 
-	decode_insn(ea);
-	init_output_buffer(buf, sizeof(buf));
+   // Adds block label
+   if (has_dummy_name(f)) {
+      get_nice_colored_name(ea, tmp, sizeof(tmp), GNCN_NOSEG | GNCN_NOFUNC);
+      out_snprintf("%s", tmp);
+      out_line(":\n", COLOR_DATNAME);
+   }
 
-	// Adds block label
-	if (has_dummy_name(f))
-	{
-		get_nice_colored_name(ea,tmp,sizeof(tmp),GNCN_NOSEG|GNCN_NOFUNC);
-		out_snprintf("%s", tmp);
-		out_line(":\n", COLOR_DATNAME);
-	}
+   if (options) {
+      qsnprintf(addr, sizeof(addr), "%a", ea);
+      out_snprintf("%s ", addr);
+   }
 
-	if (options)
-	{
-		qsnprintf(addr, sizeof(addr), "%a", ea);
-		out_snprintf("%s ", addr);
-	}
+   out_insert(get_output_ptr(), dis);
+   term_output_buffer();
 
-	out_insert(get_output_ptr(), dis);
-	term_output_buffer();
+   len = strlen(buf);
 
-	len = strlen(buf);
+   if (dl->available < (len + 3)) {
+      dll = (char *)qrealloc(dl->lines, sizeof(char*) * (dl->num + len + 256));
+      if (!dll) {
+         return -1;
+      }
+      dl->available = len + 256;
+      dl->lines = dll;
+   }
 
-	if (dl->available < (len+3))
-	{
-		dll = (char *)qrealloc(dl->lines, sizeof(char*) * (dl->num+len+256));
-		if (!dll) return -1;
+   if (dl->num) {
+      dl->lines[dl->num] = '\n';
+      dl->num++;
+   }
 
-		dl->available = len+256;
-		dl->lines = dll;
-	}
+   memcpy(&dl->lines[dl->num], buf, len);
 
-	if (dl->num)
-	{
-		dl->lines[dl->num] = '\n';
-		dl->num++;
-	}
+   dl->available -= len + 1;
+   dl->num += len;
 
-	memcpy(&dl->lines[dl->num], buf, len);
+   dl->lines[dl->num] = '\0';
 
-	dl->available -= len+1;
-	dl->num += len;
-
-	dl->lines[dl->num] = '\0';
-
-	return 0;
+   return 0;
 }
+#else
+int dline_add(dline_t *dl, ea_t ea, char options) {
+   qstring dis;
+   insn_t cmd;
+   qstring tmp;
+   char *dll;
+   int len;
+   flags_t f;
 
+   f = get_flags(ea);
+   generate_disasm_line(&dis, ea);
+
+   decode_insn(&cmd, ea);
+   outctx_base_t *pctx = create_outctx(ea);
+
+   // Adds block label
+   if (has_dummy_name(f)) {
+      get_nice_colored_name(&tmp, ea, GNCN_NOSEG | GNCN_NOFUNC);
+      pctx->out_printf("%s", tmp.c_str());
+      pctx->out_line(":\n", COLOR_DATNAME);
+   }
+
+   if (options) {
+      pctx->out_printf("%a ", ea);
+   }
+
+   pctx->out_printf("%s", dis.c_str());
+
+   len = pctx->outbuf.length();
+
+   if (dl->available < (len + 3)) {
+      dll = (char *)qrealloc(dl->lines, sizeof(char*) * (dl->num + len + 256));
+      if (!dll) {
+         return -1;
+      }
+      dl->available = len + 256;
+      dl->lines = dll;
+   }
+
+   if (dl->num) {
+      dl->lines[dl->num] = '\n';
+      dl->num++;
+   }
+
+   memcpy(&dl->lines[dl->num], pctx->outbuf.c_str(), len);
+
+   dl->available -= len + 1;
+   dl->num += len;
+
+   dl->lines[dl->num] = '\0';
+
+   delete pctx;
+   return 0;
+}
+#endif
 
 /*------------------------------------------------*/
 /* function : sig_add_address                     */
 /* description: Adds an address to the signature  */
 /*------------------------------------------------*/
 
-int sig_add_address(psig_t * sig, short opcodes[256], ea_t ea, bool b, bool line, char options)
-{
-	unsigned char byte;
-	unsigned char buf[200];
-	uint32 s, i;
-	bool call;
-	bool cj;
-	ea_t tea;
-	flags_t f;
+int sig_add_address(psig_t *sig, short opcodes[256], ea_t ea, bool b, bool line, char options) {
+   unsigned char byte;
+   unsigned char buf[200];
+   uint32 s, i;
+   bool call;
+   bool cj;
+   ea_t tea;
+   flags_t f;
 
-	if (line)
-		dline_add(&sig->dl, ea, options);
+   if (line) {
+      dline_add(&sig->dl, ea, options);
+   }
+   if (is_jump(sig, ea, &call, &cj)) {
+      return -1;
+   }
+   byte = get_byte_with_optimization(ea);
 
-	if (is_jump(sig, ea, &call, &cj))
-		return -1;
+   if (remove_instr(byte, ea)) {
+      return -1;
+   }
+   sig->lines++;
+   opcodes[byte]++;
 
-	byte = get_byte_with_optimization(ea);
+   if (!b && !call) {
+      if (cj) {
+         buf[0] = byte;
+         s = 1;
+      }
+      else {
+         s = (uint32)get_item_size(ea);
+         if (s > sizeof(buf)) {
+            s = sizeof(buf);
+         }
+         get_many_bytes(ea, buf, s);
+      }
 
-	if (remove_instr(byte, ea))
-		return -1;
+      for (i = 0; i < s; i++) {
+         sig->crc_hash += buf[i];
+         sig->crc_hash += ( sig->crc_hash << 10 );
+         sig->crc_hash ^= ( sig->crc_hash >> 6 );
+      }
+   }
+   else if (b) {
+      tea = get_first_dref_from(ea);
+      if (tea != BADADDR) {
+         f = getFlags(tea);
+         if (isASCII(f)) {
+            opinfo_t op_info;
+#if IDA_SDK_VERSION < 700
+            get_opinfo(tea, 0, f, &op_info);
+#else
+            get_opinfo(&op_info, tea, 0, f);
+#endif
+            s = get_max_ascii_length(tea, op_info.strtype);
+#if IDA_SDK_VERSION < 700
+            if (!get_ascii_contents2(tea, s, op_info.strtype, buf, sizeof(buf))) {
+               s = sizeof(buf);
+            }
+            for (i = 0; i < s; i++) {
+               sig->str_hash += buf[i] * i;
+            }
+#else
+            qstring strlit;
+            s = get_strlit_contents(&strlit, tea, s, op_info.strtype);
+            //the following attempts to match behavior of pre-7.0 patchdiff
+            if (s > sizeof(buf)) {
+               s = sizeof(buf);
+            }
+            for (i = 0; i < s; i++) {
+               sig->str_hash += strlit[i] * i;
+            }
+#endif
+         }
+      }
+   }
 
-	sig->lines++;
-	opcodes[byte]++;
-
-	if (!b && !call)
-	{
-		if (cj)
-		{
-			buf[0] = byte;
-			s = 1;
-		}
-		else
-		{
-			s = (uint32)get_item_size(ea);
-			if (s > sizeof(buf)) s = sizeof(buf);
-			get_many_bytes(ea, buf, s);
-		}
-
-		for (i=0; i<s; i++)
-		{
-			sig->crc_hash += buf[i];
-			sig->crc_hash += ( sig->crc_hash << 10 );
-			sig->crc_hash ^= ( sig->crc_hash >> 6 );
-		}
-	}
-	else if (b)
-	{
-		tea = get_first_dref_from(ea);
-		if (tea != BADADDR)
-		{
-			f = getFlags(tea);
-			if (isASCII(f))
-			{
-				opinfo_t op_info;
-				get_opinfo(tea, 0, f, &op_info);
-				s = get_max_ascii_length(tea, op_info.strtype);
-				if (!get_ascii_contents2(tea, s, op_info.strtype, buf, sizeof(buf)))
-					s = sizeof(buf);
-
-				for (i=0; i<s; i++)
-					sig->str_hash += buf[i]*i;
-			}
-		}
-	}
-
-	return 0;
+   return 0;
 }
 
 
@@ -652,31 +711,28 @@ int sig_add_address(psig_t * sig, short opcodes[256], ea_t ea, bool b, bool line
 /* description: Adds a block to the signature     */
 /*------------------------------------------------*/
 
-int sig_add_block(psig_t * sig, short opcodes[256], ea_t startEA, ea_t endEA, bool line, char options)
-{
-	ea_t ea;
-	flags_t flags;
-	bool b;
+int sig_add_block(psig_t *sig, short opcodes[256], ea_t startEA, ea_t endEA, bool line, char options) {
+   ea_t ea;
+   flags_t flags;
+   bool b;
 
-	ea = startEA;
-	while (ea < endEA)
-	{
-		flags = getFlags (ea);
-		if (!isCode (flags))
-			return -1;
+   ea = startEA;
+   while (ea < endEA) {
+      flags = getFlags (ea);
+      if (!isCode (flags)) {
+         return -1;
+      }
+      b = get_first_dref_from(ea) != BADADDR ? true : false;
+      sig_add_address(sig, opcodes, ea, isOff(flags, OPND_ALL) || b, line, options);
 
-		b = get_first_dref_from(ea) != BADADDR ? true : false;
-		sig_add_address(sig, opcodes, ea, isOff(flags, OPND_ALL) || b, line, options);
+      ea += get_item_size(ea);
+   }
 
-		ea += get_item_size(ea);
-	}
-
-	return 0;
+   return 0;
 }
 
 
-int OS_CDECL compare(const void *arg1, const void *arg2)
-{
+int OS_CDECL compare(const void *arg1, const void *arg2) {
    return *((short *)arg1) - *((short *)arg2);
 }
 
@@ -687,35 +743,37 @@ int OS_CDECL compare(const void *arg1, const void *arg2)
 /*              signature opcodes                 */
 /*------------------------------------------------*/
 
-int sig_calc_sighash(psig_t * sig, short _opcodes[256], int do_sig)
-{
-	short tmp;
-	short opcodes[256];
-	int i, j;
+int sig_calc_sighash(psig_t *sig, short _opcodes[256], int do_sig) {
+   short tmp;
+   short opcodes[256];
+   int i, j;
 
-	memcpy(opcodes, _opcodes, sizeof(opcodes));
-	qsort(opcodes, 256, sizeof(short), compare);
+   memcpy(opcodes, _opcodes, sizeof(opcodes));
+   qsort(opcodes, 256, sizeof(short), compare);
 
-	for (i=0; i<256; i++)
-		for (j=0; j<255; j++)
-			if (opcodes[j] > opcodes[j+1])
-			{
-				tmp = opcodes[j+1];
-				opcodes[j+1] = opcodes[j];
-				opcodes[j] = tmp;
-			}
+   for (i = 0; i < 256; i++) {
+      for (j = 0; j < 255; j++) {
+         if (opcodes[j] > opcodes[j+1]) {
+            tmp = opcodes[j+1];
+            opcodes[j+1] = opcodes[j];
+            opcodes[j] = tmp;
+         }
+      }
+   }
 
-	sig->hash2 = 0;
-	if (do_sig)	sig->sig = 0;
+   sig->hash2 = 0;
+   if (do_sig) {
+      sig->sig = 0;
+   }
+   for (i = 0; i < 256; i++) {
+      if (do_sig) {
+         sig->sig += opcodes[i] * i;
+      }
+      sig->hash2 = ror(sig->hash2, 13);
+      sig->hash2 += _opcodes[i];
+   }
 
-	for (i=0; i<256; i++)
-	{
-		if (do_sig) sig->sig += opcodes[i] * i;
-		sig->hash2 = ror(sig->hash2, 13);
-		sig->hash2 += _opcodes[i];
-	}
-
-	return 0;
+   return 0;
 }
 
 
@@ -726,36 +784,33 @@ int sig_calc_sighash(psig_t * sig, short _opcodes[256], int do_sig)
 /*              on success                        */
 /*------------------------------------------------*/
 
-ea_t sig_parse_dref_list(psig_t * sig, ea_t ea)
-{
-	ea_t fref;
-	flags_t f;
+ea_t sig_parse_dref_list(psig_t *sig, ea_t ea) {
+   ea_t fref;
+   flags_t f;
 
-	// scan up
-	do
-	{
-		fref = get_first_dref_from(ea);
-		if (fref == BADADDR)
-			return BADADDR;
+   // scan up
+   do {
+      fref = get_first_dref_from(ea);
+      if (fref == BADADDR) {
+         return BADADDR;
+      }
+      f = getFlags(fref);
+      if (!isCode(f)) {
+         return BADADDR;
+      }
+      fref = get_first_dref_to(ea);
+      if (fref != BADADDR) {
+         f = getFlags(fref);
+         if (!isCode(f)) {
+            return BADADDR;
+         }
+         return ea;
+      }
 
-		f = getFlags(fref);
-		if (!isCode(f))
-			return BADADDR;
+      ea = prev_visea(ea);
+   } while(ea != BADADDR);
 
-		fref = get_first_dref_to(ea);
-		if (fref != BADADDR)
-		{
-			f = getFlags(fref);
-			if (!isCode(f))
-				return BADADDR;
-
-			return ea;
-		}
-
-		ea = prev_visea(ea);
-	} while(ea != BADADDR);
-
-	return ea;
+   return ea;
 }
 
 
@@ -765,12 +820,11 @@ ea_t sig_parse_dref_list(psig_t * sig, ea_t ea)
 /*              a class                           */
 /*------------------------------------------------*/
 
-bool sig_is_class(psig_t * sig)
-{
-	if (sig->sig == CLASS_SIG && sig->hash == CLASS_SIG && sig->crc_hash == CLASS_SIG)
-		return true;
-
-	return false;
+bool sig_is_class(psig_t *sig) {
+   if (sig->sig == CLASS_SIG && sig->hash == CLASS_SIG && sig->crc_hash == CLASS_SIG) {
+      return true;
+   }
+   return false;
 }
 
 
@@ -780,38 +834,34 @@ bool sig_is_class(psig_t * sig)
 /*              class structure                   */
 /*------------------------------------------------*/
 
-psig_t * sig_class_generate(ea_t ea)
-{
-	func_t * xfct;
-	psig_t * sig;
-	ea_t fref;
-	char buf[512];
+psig_t *sig_class_generate(ea_t ea) {
+   func_t *xfct;
+   psig_t *sig;
+   ea_t fref;
 
-	sig = sig_init();
-	if (!sig)
-		return NULL;
+   sig = sig_init();
+   if (!sig) {
+      return NULL;
+   }
+   // Adds function start address
+   sig_set_start(sig, ea);
 
-	// Adds function start address
-	sig_set_start(sig, ea);
+   // Adds function name
+   sig->name.sprnt("sub_%a", ea);
 
-	// Adds function name
-	qsnprintf(buf, sizeof(buf), "sub_%a", ea);
-	sig_set_name(sig, buf);
+   // Adds class references
+   fref = get_first_dref_to(ea);
+   while (fref != BADADDR) {
+      xfct = get_func(fref);
+      if (xfct) {
+         sig_add_sref(sig, xfct->startEA, 0, CHECK_REF);
+      }
+      fref = get_next_dref_to(ea, fref);
+   }
 
-	// Adds class references
-	fref = get_first_dref_to(ea);
-	while (fref != BADADDR)
-	{
-		xfct = get_func(fref);
-		if (xfct)
-			sig_add_sref(sig, xfct->startEA, 0, CHECK_REF);
+   sig->hash = sig->crc_hash = sig->sig = CLASS_SIG;
 
-		fref = get_next_dref_to(ea, fref);
-	}
-
-	sig->hash = sig->crc_hash = sig->sig = CLASS_SIG;
-
-	return sig;
+   return sig;
 }
 
 
@@ -821,161 +871,153 @@ psig_t * sig_class_generate(ea_t ea)
 /*              given function                    */
 /*------------------------------------------------*/
 
-psig_t * sig_generate(size_t fct_num, qvector<ea_t> & class_l)
-{
-	func_t * fct, * xfct;
-	pflow_chart_t * fchart;
-	psig_t * sig;
-	ea_t fref, ea;
-	int bnum, i;
-	char buf[512];
-	short opcodes[256];
-	qvector<int> call_list;
-	flags_t f;
+psig_t *sig_generate(size_t fct_num, qvector<ea_t> &class_l) {
+   func_t *fct, *xfct;
+   pflow_chart_t *fchart;
+   psig_t *sig;
+   ea_t fref, ea;
+   int bnum, i;
+   char buf[512];
+   short opcodes[256];
+   qvector<int> call_list;
+   flags_t f;
 
-	fct = getn_func(fct_num);
+   fct = getn_func(fct_num);
 
-	memset(opcodes, '\0', sizeof(opcodes));
-	fchart = new pflow_chart_t(fct);
-	sig = sig_init();
-	if (!sig)
-	{
-		delete fchart;
-		return NULL;
-	}
+   memset(opcodes, '\0', sizeof(opcodes));
+   fchart = new pflow_chart_t(fct);
+   sig = sig_init();
+   if (!sig) {
+      delete fchart;
+      return NULL;
+   }
 
-	sig->type = 1;
+   sig->type = 1;
 
-	// Adds function start address
-	sig_set_start(sig, fct->startEA);
+   // Adds function start address
+   sig_set_start(sig, fct->startEA);
 
-	// Adds function name
-	if (pget_func_name(fct->startEA, buf, sizeof(buf)))
-		sig_set_name(sig, buf);
-	else return NULL;
+   // Adds function name
+   if (pget_func_name(fct->startEA, buf, sizeof(buf))) {
+      sig_set_name(sig, buf);
+   }
+   else {
+      return NULL;
+   }
+   // Adds function references
 
-	// Adds function references
+   fref = get_first_dref_to(fct->startEA);
 
-	fref = get_first_dref_to(fct->startEA);
+   while (fref != BADADDR) {
+      f = getFlags(fref);
+      if (isCode(f)) {
+         xfct = get_func(fref);
+         if (xfct && xfct->startEA != fct->startEA) {
+            sig_add_pref(sig, xfct->startEA, 0, CHECK_REF);
+         }
+      }
+      else {
+         ea = sig_parse_dref_list(sig, fref);
+         if (ea != BADADDR) {
+            sig_add_pref(sig, ea, 0, CHECK_REF);
+            class_l.add_unique(ea);
+         }
+      }
 
-	while (fref != BADADDR)
-	{
-		f = getFlags(fref);
-		if (isCode(f))
-		{
-			xfct = get_func(fref);
-			if (xfct && xfct->startEA != fct->startEA)
-				sig_add_pref(sig, xfct->startEA, 0, CHECK_REF);
-		}
-		else
-		{
-			ea = sig_parse_dref_list(sig, fref);
-			if (ea != BADADDR)
-			{
-				sig_add_pref(sig, ea, 0, CHECK_REF);
-				class_l.add_unique(ea);
-			}
-		}
-
-		fref = get_next_dref_to(fct->startEA, fref);
-	}
+      fref = get_next_dref_to(fct->startEA, fref);
+   }
 
 
-	// Adds each block to the signature
-	bnum = fchart->nproper;
-	
-	sig->hash = 0;
-	sig->sig = 0;
+   // Adds each block to the signature
+   bnum = fchart->nproper;
+   
+   sig->hash = 0;
+   sig->sig = 0;
 
 
-	for (i=0; i<bnum; i++)
-	{
-		int j;
-		int ttype;
-		int smax = fchart->nsucc(i);
-		sig->sig += (i+1) + smax*i;
+   for (i = 0; i < bnum; i++) {
+      int j;
+      int ttype;
+      int smax = fchart->nsucc(i);
+      sig->sig += (i + 1) + smax * i;
 
-		sig_add_block(sig, opcodes, fchart->blocks[i].startEA, fchart->blocks[i].endEA, 0, 0);
-		for(j=0; j<smax; j++)
-		{
-			sig->hash = ror(sig->hash, 13);
-			ttype = fchart->blocks[i].succ[j].type;
-			if (ttype == 2) ttype--;
-			sig->hash += ttype;
-		}
-	}
+      sig_add_block(sig, opcodes, fchart->blocks[i].startEA, fchart->blocks[i].endEA, 0, 0);
+      for (j = 0; j < smax; j++) {
+         sig->hash = ror(sig->hash, 13);
+         ttype = fchart->blocks[i].succ[j].type;
+         if (ttype == 2) {
+            ttype--;
+         }
+         sig->hash += ttype;
+      }
+   }
 
-	sig_calc_sighash(sig, opcodes, 0);
+   sig_calc_sighash(sig, opcodes, 0);
 
-	delete fchart;
+   delete fchart;
 
-	return sig;
+   return sig;
 }
 
 
 /*------------------------------------------------*/
 /* function : sig_save                            */
-/* description: Saves signature refs to disk	  */
+/* description: Saves signature refs to disk   */
 /*------------------------------------------------*/
 
-void sig_save_refs(FILE * fp, frefs_t * refs)
-{
-	int num, i;
-	fref_t * tmp;
+void sig_save_refs(FILE *fp, frefs_t *refs) {
+   int num, i;
+   fref_t * tmp;
 
-	if (refs)
-	{
-		num = refs->num;
-		qfwrite(fp, &num, sizeof(num));
-		tmp = refs->list;
-		for (i=0; i<num; i++)
-		{
-			qfwrite(fp, &tmp->ea, sizeof(tmp->ea));
-			qfwrite(fp, &tmp->type, sizeof(tmp->type));
-			tmp = tmp->next;
-		}
-	}
-	else
-	{
-		num = 0;
-		qfwrite(fp, &num, sizeof(num));
-	}
+   if (refs) {
+      num = refs->num;
+      qfwrite(fp, &num, sizeof(num));
+      tmp = refs->list;
+      for (i = 0; i < num; i++) {
+         qfwrite(fp, &tmp->ea, sizeof(tmp->ea));
+         qfwrite(fp, &tmp->type, sizeof(tmp->type));
+         tmp = tmp->next;
+      }
+   }
+   else {
+      num = 0;
+      qfwrite(fp, &num, sizeof(num));
+   }
 }
 
 
 /*------------------------------------------------*/
 /* function : sig_save                            */
-/* description: Saves signature to disk	          */
+/* description: Saves signature to disk             */
 /*------------------------------------------------*/
 
-int sig_save(psig_t * sig, FILE * fp)
-{
-	size_t len;
+int sig_save(psig_t *sig, FILE *fp) {
+   size_t len;
 
-	// saves function name
-	len = strlen(sig->name);
-	qfwrite(fp, &len, sizeof(len));
-	qfwrite(fp, sig->name, len);
+   // saves function name
+   len = sig->name.length();
+   qfwrite(fp, &len, sizeof(len));
+   qfwrite(fp, sig->name.c_str(), len);
 
-	// saves function start address
-	qfwrite(fp, &sig->startEA, sizeof(sig->startEA));
+   // saves function start address
+   qfwrite(fp, &sig->startEA, sizeof(sig->startEA));
 
-	// saves function lines
-	qfwrite(fp, &sig->dl.num, sizeof(sig->dl.num));
-	qfwrite(fp, sig->dl.lines, sig->dl.num);
+   // saves function lines
+   qfwrite(fp, &sig->dl.num, sizeof(sig->dl.num));
+   qfwrite(fp, sig->dl.lines, sig->dl.num);
 
-	// saves sig/hash
-	qfwrite(fp, &sig->sig, sizeof(sig->sig));
-	qfwrite(fp, &sig->hash, sizeof(sig->hash));
-	qfwrite(fp, &sig->hash2, sizeof(sig->hash2));
-	qfwrite(fp, &sig->crc_hash, sizeof(sig->crc_hash));
-	qfwrite(fp, &sig->str_hash, sizeof(sig->str_hash));
+   // saves sig/hash
+   qfwrite(fp, &sig->sig, sizeof(sig->sig));
+   qfwrite(fp, &sig->hash, sizeof(sig->hash));
+   qfwrite(fp, &sig->hash2, sizeof(sig->hash2));
+   qfwrite(fp, &sig->crc_hash, sizeof(sig->crc_hash));
+   qfwrite(fp, &sig->str_hash, sizeof(sig->str_hash));
 
-	// saves function refs
-	sig_save_refs(fp, sig->prefs);
-	sig_save_refs(fp, sig->srefs);
+   // saves function refs
+   sig_save_refs(fp, sig->prefs);
+   sig_save_refs(fp, sig->srefs);
 
-	return 0;
+   return 0;
 }
 
 
@@ -984,30 +1026,29 @@ int sig_save(psig_t * sig, FILE * fp)
 /* description: Loads signature  refs from disk   */
 /*------------------------------------------------*/
 
-void sig_load_prefs(psig_t * sig, FILE * fp, int type)
-{
-	int num, i;
-	pedge_t * eatab;
+void sig_load_prefs(psig_t *sig, FILE *fp, int type) {
+   int num, i;
+   pedge_t * eatab;
 
-	// loads function refs in reverse order
-	qfread(fp, &num, sizeof(num));
-	eatab = (pedge_t *)qalloc(num * sizeof(*eatab));
+   // loads function refs in reverse order
+   qfread(fp, &num, sizeof(num));
+   eatab = (pedge_t *)qalloc(num * sizeof(*eatab));
 
-	for (i=0; i<num; i++)
-	{
-		qfread(fp, &eatab[i].ea, sizeof(eatab[i].ea));
-		qfread(fp, &eatab[i].type, sizeof(eatab[i].type));
-	}
+   for (i = 0; i < num; i++) {
+      qfread(fp, &eatab[i].ea, sizeof(eatab[i].ea));
+      qfread(fp, &eatab[i].type, sizeof(eatab[i].type));
+   }
 
-	for (i=num; i>0; i--)
-	{
-		if (type == SIG_PRED)
-			sig_add_pref(sig, eatab[i-1].ea, eatab[i-1].type, CHECK_REF);
-		else
-			sig_add_sref(sig, eatab[i-1].ea, eatab[i-1].type, CHECK_REF);
-	}
+   for (i = num; i > 0; i--) {
+      if (type == SIG_PRED) {
+         sig_add_pref(sig, eatab[i-1].ea, eatab[i-1].type, CHECK_REF);
+      }
+      else {
+         sig_add_sref(sig, eatab[i-1].ea, eatab[i-1].type, CHECK_REF);
+      }
+   }
 
-	qfree(eatab);
+   qfree(eatab);
 }
 
 
@@ -1016,49 +1057,48 @@ void sig_load_prefs(psig_t * sig, FILE * fp, int type)
 /* description: Loads signature from disk         */
 /*------------------------------------------------*/
 
-psig_t * sig_load(FILE * fp)
-{
-	size_t len;
-	psig_t * sig;
-	char buf[512];
+psig_t *sig_load(FILE *fp) {
+   size_t len;
+   psig_t * sig;
+   char buf[512];
 
-	sig = sig_init();
-	if (!sig) return NULL;
+   sig = sig_init();
+   if (!sig) {
+      return NULL;
+   }
+   // loads function name
+   qfread(fp, &len, sizeof(len));
+   qfread(fp, buf, len);
+   buf[len] = '\0';
 
-	// loads function name
-	qfread(fp, &len, sizeof(len));
-	qfread(fp, buf, len);
-	buf[len] = '\0';
+   sig_set_name(sig, buf);
 
-	sig_set_name(sig, buf);
+   // loads function start address
+   qfread(fp, &sig->startEA, sizeof(sig->startEA));
 
-	// loads function start address
-	qfread(fp, &sig->startEA, sizeof(sig->startEA));
+   // loads function line
+   qfread(fp, &sig->dl.num, sizeof(sig->dl.num));
+   sig->dl.lines = (char *)qalloc((sig->dl.num+1) * sizeof(char));
+   if (sig->dl.lines) {
+      qfread(fp, sig->dl.lines, sig->dl.num);
+      sig->dl.lines[sig->dl.num] = '\0';
+   }
+   else {
+      sig->dl.num = 0;
+   }
 
-	// loads function line
-	qfread(fp, &sig->dl.num, sizeof(sig->dl.num));
-	sig->dl.lines = (char *)qalloc((sig->dl.num+1) * sizeof(char));
-	if (sig->dl.lines)
-	{
-		qfread(fp, sig->dl.lines, sig->dl.num);
-		sig->dl.lines[sig->dl.num] = '\0';
-	}
-	else
-		sig->dl.num = 0;
+   // loads sig/hash
+   qfread(fp, &sig->sig, sizeof(sig->sig));
+   qfread(fp, &sig->hash, sizeof(sig->hash));
+   qfread(fp, &sig->hash2, sizeof(sig->hash2));
+   qfread(fp, &sig->crc_hash, sizeof(sig->crc_hash));
+   qfread(fp, &sig->str_hash, sizeof(sig->str_hash));
 
+   // loads sig refs
+   sig_load_prefs(sig, fp, SIG_PRED);
+   sig_load_prefs(sig, fp, SIG_SUCC);
 
-	// loads sig/hash
-	qfread(fp, &sig->sig, sizeof(sig->sig));
-	qfread(fp, &sig->hash, sizeof(sig->hash));
-	qfread(fp, &sig->hash2, sizeof(sig->hash2));
-	qfread(fp, &sig->crc_hash, sizeof(sig->crc_hash));
-	qfread(fp, &sig->str_hash, sizeof(sig->str_hash));
-
-	// loads sig refs
-	sig_load_prefs(sig, fp, SIG_PRED);
-	sig_load_prefs(sig, fp, SIG_SUCC);
-
-	return sig;
+   return sig;
 }
 
 
@@ -1067,25 +1107,25 @@ psig_t * sig_load(FILE * fp)
 /* description: Initializes a new signature list  */
 /*------------------------------------------------*/
 
-slist_t * siglist_init(size_t num, char * file)
-{
-	slist_t * l;
+slist_t *siglist_init(size_t num, char *file) {
+   slist_t *l;
 
-	l = (slist_t *)qalloc(sizeof(*l));
-	if (!l)	return NULL;
+   l = (slist_t *)qalloc(sizeof(*l));
+   if (!l) {
+      return NULL;
+   }
 
-	l->file = file;
-	l->num = 0;
-	l->org_num = num;
-	l->sigs = (psig_t **)qalloc(num * sizeof(*l->sigs));
+   l->file = file;
+   l->num = 0;
+   l->org_num = num;
+   l->sigs = (psig_t **)qalloc(num * sizeof(*l->sigs));
 
-	if (!l->sigs && l->org_num != 0)
-	{
-		qfree(l);
-		return NULL;
-	}
+   if (!l->sigs && l->org_num != 0) {
+      qfree(l);
+      return NULL;
+   }
 
-	return l;
+   return l;
 }
 
 
@@ -1094,18 +1134,17 @@ slist_t * siglist_init(size_t num, char * file)
 /* description: Realloc a signature list          */
 /*------------------------------------------------*/
 
-bool siglist_realloc(slist_t * sl, size_t num)
-{
-	psig_t ** sigs;
+bool siglist_realloc(slist_t *sl, size_t num) {
+   psig_t ** sigs;
 
-	sigs = (psig_t **)qrealloc(sl->sigs, (sl->org_num + num) * sizeof(*sl->sigs));
-	if (!sigs)
-		return false;
+   sigs = (psig_t **)qrealloc(sl->sigs, (sl->org_num + num) * sizeof(*sl->sigs));
+   if (!sigs) {
+      return false;
+   }
+   sl->org_num += num;
+   sl->sigs = sigs;
 
-	sl->org_num += num;
-	sl->sigs = sigs;
-
-	return true;
+   return true;
 }
 
 
@@ -1114,35 +1153,46 @@ bool siglist_realloc(slist_t * sl, size_t num)
 /* description: Compares two signature            */
 /*------------------------------------------------*/
 
-int OS_CDECL sig_compare(const void *arg1, const void *arg2)
-{
-	unsigned long v1, v2;
+int OS_CDECL sig_compare(const void *arg1, const void *arg2) {
+   unsigned long v1, v2;
 
-	v1 = (*(psig_t **)arg1)->sig;
-	v2 = (*(psig_t **)arg2)->sig;
+   v1 = (*(psig_t **)arg1)->sig;
+   v2 = (*(psig_t **)arg2)->sig;
 
-	if (v2 > v1) return 1;
-	if (v2 < v1) return -1;
+   if (v2 > v1) {
+      return 1;
+   }
+   if (v2 < v1) {
+      return -1;
+   }
+   v1 = (*(psig_t **)arg1)->hash;
+   v2 = (*(psig_t **)arg2)->hash;
 
-	v1 = (*(psig_t **)arg1)->hash;
-	v2 = (*(psig_t **)arg2)->hash;
+   if (v2 > v1) {
+      return 1;
+   }
+   if (v2 < v1) {
+      return -1;
+   }
+   v1 = (*(psig_t **)arg1)->crc_hash;
+   v2 = (*(psig_t **)arg2)->crc_hash;
 
-	if (v2 > v1) return 1;
-	if (v2 < v1) return -1;
+   if (v2 > v1) {
+      return 1;
+   }
+   if (v2 < v1) {
+      return -1;
+   }
+   v1 = (*(psig_t **)arg1)->str_hash;
+   v2 = (*(psig_t **)arg2)->str_hash;
 
-	v1 = (*(psig_t **)arg1)->crc_hash;
-	v2 = (*(psig_t **)arg2)->crc_hash;
-
-	if (v2 > v1) return 1;
-	if (v2 < v1) return -1;
-
-	v1 = (*(psig_t **)arg1)->str_hash;
-	v2 = (*(psig_t **)arg2)->str_hash;
-
-	if (v2 > v1) return 1;
-	if (v2 < v1) return -1;
-
-	return 0;
+   if (v2 > v1) {
+      return 1;
+   }
+   if (v2 < v1) {
+      return -1;
+   }
+   return 0;
 }
 
 
@@ -1151,9 +1201,8 @@ int OS_CDECL sig_compare(const void *arg1, const void *arg2)
 /* description: Sorts the signature to the list   */
 /*------------------------------------------------*/
 
-void siglist_sort(slist_t * sl)
-{
-	qsort(sl->sigs, sl->num, sizeof(*sl->sigs), sig_compare);
+void siglist_sort(slist_t *sl) {
+   qsort(sl->sigs, sl->num, sizeof(*sl->sigs), sig_compare);
 }
 
 
@@ -1162,16 +1211,15 @@ void siglist_sort(slist_t * sl)
 /* description: Adds a new signature to the list  */
 /*------------------------------------------------*/
 
-void siglist_add(slist_t * sl, psig_t * sig)
-{
-	if (sl->num >= sl->org_num)
-	{
-		if (!siglist_realloc(sl, 32))
-			return;
-	}
+void siglist_add(slist_t *sl, psig_t *sig) {
+   if (sl->num >= sl->org_num) {
+      if (!siglist_realloc(sl, 32)) {
+         return;
+      }
+   }
 
-	sig->node = sl->num;
-	sl->sigs[sl->num++] = sig;
+   sig->node = sl->num;
+   sl->sigs[sl->num++] = sig;
 }
 
 
@@ -1181,12 +1229,11 @@ void siglist_add(slist_t * sl, psig_t * sig)
 /*              list                              */
 /*------------------------------------------------*/
 
-void siglist_remove(slist_t * sl, size_t n)
-{
-	if ( (n+1) < sl->num )
-		memmove(&sl->sigs[n], &sl->sigs[n+1], ((sl->num - 1) - n) * sizeof(*(sl->sigs)));
-
-	sl->num--;
+void siglist_remove(slist_t *sl, size_t n) {
+   if ( (n+1) < sl->num ) {
+      memmove(&sl->sigs[n], &sl->sigs[n+1], ((sl->num - 1) - n) * sizeof(*(sl->sigs)));
+   }
+   sl->num--;
 }
 
 
@@ -1195,15 +1242,14 @@ void siglist_remove(slist_t * sl, size_t n)
 /* description: Frees a new signature list        */
 /*------------------------------------------------*/
 
-void siglist_free(slist_t * sl)
-{
-	size_t i;
+void siglist_free(slist_t * sl) {
+   size_t i;
 
-	for (i=0; i<sl->num; i++)
-		sig_free(sl->sigs[i]);
-
-	qfree(sl->sigs);
-	qfree(sl);
+   for (i = 0; i < sl->num; i++) {
+      sig_free(sl->sigs[i]);
+   }
+   qfree(sl->sigs);
+   qfree(sl);
 }
 
 
@@ -1212,10 +1258,9 @@ void siglist_free(slist_t * sl)
 /* description: Frees a new signature list        */
 /*------------------------------------------------*/
 
-void siglist_partial_free(slist_t * sl)
-{
-	qfree(sl->sigs);
-	qfree(sl);
+void siglist_partial_free(slist_t *sl) {
+   qfree(sl->sigs);
+   qfree(sl);
 }
 
 
@@ -1225,9 +1270,8 @@ void siglist_partial_free(slist_t * sl)
 /*              list                              */
 /*------------------------------------------------*/
 
-size_t siglist_getnum(slist_t * sl)
-{
-	return sl->num;
+size_t siglist_getnum(slist_t *sl) {
+   return sl->num;
 }
 
 
@@ -1236,23 +1280,23 @@ size_t siglist_getnum(slist_t * sl)
 /* description: Saves signature list to disk      */
 /*------------------------------------------------*/
 
-int siglist_save(slist_t * sl, const char * filename)
-{
-	FILE * fp;
-	size_t num, i;
+int siglist_save(slist_t *sl, const char *filename) {
+   FILE * fp;
+   size_t num, i;
 
-	fp = qfopen(filename, "wb+");
-	if (fp == 0) return -1;
-	
-	num = siglist_getnum(sl);
-	qfwrite(fp, &num, sizeof(num));
+   fp = qfopen(filename, "wb+");
+   if (fp == 0) {
+      return -1;
+   }
+   num = siglist_getnum(sl);
+   qfwrite(fp, &num, sizeof(num));
 
-	for (i=0; i<num; i++)
-		sig_save(sl->sigs[i], fp);
+   for (i = 0; i < num; i++) {
+      sig_save(sl->sigs[i], fp);
+   }
+   qfclose(fp);
 
-	qfclose(fp);
-
-	return 0;
+   return 0;
 }
 
 
@@ -1261,39 +1305,36 @@ int siglist_save(slist_t * sl, const char * filename)
 /* description: Loads signature list from disk    */
 /*------------------------------------------------*/
 
-slist_t * siglist_load(const char *filename)
-{
-	FILE * fp;
-	slist_t * sl;
-	psig_t * sig;
-	size_t num, i;
+slist_t * siglist_load(const char *filename) {
+   FILE * fp;
+   slist_t * sl;
+   psig_t * sig;
+   size_t num, i;
 
-	fp = qfopen(filename, "rb");
-	if (fp < 0) return NULL;
+   fp = qfopen(filename, "rb");
+   if (fp < 0) {
+      return NULL;
+   }
+   if (qfread(fp, &num, sizeof(num)) != sizeof(num)) {
+      qfclose(fp);
+      return NULL;
+   }
 
-	if (qfread(fp, &num, sizeof(num)) != sizeof(num))
-	{
-		qfclose(fp);
-		return NULL;
-	}
+   sl = siglist_init(num, NULL);
+   if (!sl) {
+      qfclose(fp);
+      return NULL;
+   }
 
-	sl = siglist_init(num, NULL);
-	if (!sl)
-	{
-		qfclose(fp);
-		return NULL;
-	}
+   for (i = 0; i < num; i++) {
+      sig = sig_load(fp);
+      siglist_add(sl, sig);
+   }
 
-	for (i=0; i<num; i++)
-	{
-		sig = sig_load(fp);
-		siglist_add(sl, sig);
-	}
+   siglist_sort(sl);
 
-	siglist_sort(sl);
+   qfclose(fp);
 
-	qfclose(fp);
-
-	return sl;
+   return sl;
 }
 
