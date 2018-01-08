@@ -22,6 +22,8 @@
 #include <signal.h>
 #include <stdio.h>
 
+#define USE_DANGEROUS_FUNCTIONS
+
 #include <ida.hpp>
 #include <kernwin.hpp>
 
@@ -143,12 +145,14 @@ int os_unlink(const char *path) {
 /*------------------------------------------------*/
 
 void os_tempnam(char *data, size_t size, const char *suffix) {
-   char *str = strdup(P_tmpdir "patchdiff2-XXXXXX");;
+   char *str = strdup(P_tmpdir "/patchdiff2-XXXXXX");;
 
-   // TODO: Just use mktemp and don't mind the lack of extension
-   char *tempname = mktemp(str);
-   qsnprintf(data, size, "%s%s", tempname, suffix);
-   free(tempname);
+   // TODO: Just use mkstemp and don't mind the lack of extension
+   int fd = mkstemp(str);
+   close(fd);
+   unlink(str);
+   qsnprintf(data, size, "%s%s", str, suffix);
+   free(str);
 }
 
 

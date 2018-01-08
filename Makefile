@@ -1,5 +1,5 @@
 #Set this variable to point to your SDK directory
-IDA_SDK=../../../
+IDA_SDK=../../
 
 SDKVER=$(shell pwd | grep -o -E "idasdk[0-9]{2,3}" | cut -c 7-)
 IDAVER=$(shell pwd | grep -o -E "idasdk[0-9]{2,3}" | cut -c 7- | sed 's/\(.\)\(.\)/\1\.\2/')
@@ -69,13 +69,13 @@ OBJDIR32=./obj32
 OBJDIR64=./obj64
 
 #list out the object files in your project here
-OBJS32=	$(OBJDIR32)/collabreate.o $(OBJDIR32)/backup.o $(OBJDIR32)/clist.o $(OBJDIR32)/diff.o $(OBJDIR32)/display.o \
-	$(OBJDIR32)/hash.o $(OBJDIR32)/options.o $(OBJDIR32)/parser.o $(OBJDIR32)/patchdiff.o $(OBJDIR32)/pchart.o
-	$(OBJDIR32)/pgraph.o $(OBJDIR32)/ppc.o $(OBJDIR32)/precomp.o $(OBJDIR32)/sig.o $(OBJDIR32)/system.o
+OBJS32=	$(OBJDIR32)/backup.o $(OBJDIR32)/clist.o $(OBJDIR32)/diff.o $(OBJDIR32)/display.o \
+	$(OBJDIR32)/hash.o $(OBJDIR32)/options.o $(OBJDIR32)/parser.o $(OBJDIR32)/patchdiff.o $(OBJDIR32)/pchart.o \
+	$(OBJDIR32)/pgraph.o $(OBJDIR32)/ppc.o $(OBJDIR32)/precomp.o $(OBJDIR32)/sig.o $(OBJDIR32)/system.o \
 	$(OBJDIR32)/unix_fct.o $(OBJDIR32)/x86.o
-OBJS64=	$(OBJDIR64)/collabreate.o $(OBJDIR64)/backup.o $(OBJDIR64)/clist.o $(OBJDIR64)/diff.o $(OBJDIR64)/display.o \
-	$(OBJDIR64)/hash.o $(OBJDIR64)/options.o $(OBJDIR64)/parser.o $(OBJDIR64)/patchdiff.o $(OBJDIR64)/pchart.o
-	$(OBJDIR64)/pgraph.o $(OBJDIR64)/ppc.o $(OBJDIR64)/precomp.o $(OBJDIR64)/sig.o $(OBJDIR64)/system.o
+OBJS64=	$(OBJDIR64)/backup.o $(OBJDIR64)/clist.o $(OBJDIR64)/diff.o $(OBJDIR64)/display.o \
+	$(OBJDIR64)/hash.o $(OBJDIR64)/options.o $(OBJDIR64)/parser.o $(OBJDIR64)/patchdiff.o $(OBJDIR64)/pchart.o \
+	$(OBJDIR64)/pgraph.o $(OBJDIR64)/ppc.o $(OBJDIR64)/precomp.o $(OBJDIR64)/sig.o $(OBJDIR64)/system.o \
 	$(OBJDIR64)/unix_fct.o $(OBJDIR64)/x86.o
 
 BINARY32=$(OUTDIR)$(PLUGIN)$(PLUGIN_EXT32)

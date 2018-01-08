@@ -52,6 +52,8 @@
 #include <graph.hpp>
 #pragma warning(pop)
 
+extern plugin_t PLUGIN;
+
 static_assert(IDA_SDK_VERSION >= 650, "This plugin expects a minimum IDA SDK 6.5");
 
 #ifndef __PRECOMP_H
