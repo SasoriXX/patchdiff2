@@ -885,9 +885,6 @@ public:
       return cbret_t(); // nothing changed
    }
    
-   virtual void idaapi closed() {
-      close_window(eng);
-   }
 };
 
 inline matched_chooser_t::matched_chooser_t(deng_t *eng_) :

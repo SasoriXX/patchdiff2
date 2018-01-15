@@ -95,7 +95,7 @@ options_t *options_init() {
 #if IDA_SDK_VERSION <= 660
    add_menu_item("Options/", "PatchDiff2", NULL, SETMENU_APP, pdiff_menu_callback, opts);
 #else
-  register_and_attach_to_menu(
+   register_and_attach_to_menu(
           "Options/Setup", OPTIONS_NAME, "PatchDiff2",
           NULL, SETMENU_APP | SETMENU_CTXIDA,
           &options_action_handler, &PLUGIN);

@@ -1285,7 +1285,7 @@ int siglist_save(slist_t *sl, const char *filename) {
    size_t num, i;
 
    fp = qfopen(filename, "wb+");
-   if (fp == 0) {
+   if (fp == NULL) {
       return -1;
    }
    num = siglist_getnum(sl);
@@ -1305,14 +1305,14 @@ int siglist_save(slist_t *sl, const char *filename) {
 /* description: Loads signature list from disk    */
 /*------------------------------------------------*/
 
-slist_t * siglist_load(const char *filename) {
+slist_t *siglist_load(const char *filename) {
    FILE * fp;
    slist_t * sl;
    psig_t * sig;
    size_t num, i;
 
    fp = qfopen(filename, "rb");
-   if (fp < 0) {
+   if (fp == NULL) {
       return NULL;
    }
    if (qfread(fp, &num, sizeof(num)) != sizeof(num)) {

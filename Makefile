@@ -63,7 +63,7 @@ endif
 EXTRALIBS=
 
 # Destination directory for compiled plugins
-OUTDIR=$(IDA_SDK)bin/plugins/
+OUTDIR=./bin/
 
 OBJDIR32=./obj32
 OBJDIR64=./obj64
@@ -135,6 +135,10 @@ $(BINARY64): $(OBJDIR64) $(OBJS64)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS64) $(IDADIR) $(IDALIB64) $(EXTRALIBS) 
 
 endif
+
+
+$(OUTDIR):
+	-@mkdir -p $(OUTDIR)
 
 backup.cpp: backup.h precomp.h sig.h diff.h options.h
 clist.cpp: clist.h precomp.h sig.h hash.cpp
