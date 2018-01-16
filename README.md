@@ -18,4 +18,4 @@ Build note
 ============
 
 The Visual Studio project and the Unix Makefile utilize relative paths to the SDK include directory.
-You should clone into <IDASDK>/plugins/
+You should clone into &lt;SDKDIR&gt;/plugins/
