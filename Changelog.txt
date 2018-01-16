@@ -1,6 +1,6 @@
 PatchDiff v2.0.11:
 
-* Update to cuild/run with IDA versions >= 6.7 (through 7.0)
+* Update to build/run with IDA versions >= 6.7 (through 7.0)
 
 PatchDiff v2.0.10a:
 
