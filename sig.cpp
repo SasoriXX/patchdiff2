@@ -1313,15 +1313,18 @@ slist_t *siglist_load(const char *filename) {
 
    fp = qfopen(filename, "rb");
    if (fp == NULL) {
+      msg("siglist_load: qfopen('%s', 'rb') failed\n", filename);
       return NULL;
    }
    if (qfread(fp, &num, sizeof(num)) != sizeof(num)) {
+      msg("siglist_load: qfread(...) failed\n");
       qfclose(fp);
       return NULL;
    }
 
    sl = siglist_init(num, NULL);
    if (!sl) {
+      msg("siglist_load: siglist_init(...) failed\n");
       qfclose(fp);
       return NULL;
    }

@@ -31,9 +31,8 @@ static bool idaapi pdiff_menu_callback(void *ud) {
    const char format[] =
          "STARTITEM 0\n"
 
-         "PatchDiff2 options\n"
-         "<##Settings #>\n"
-         "<#Uses 'pipe' with the second IDA instance to speed up graph display#Keep second IDB open :C>\n"
+         "PatchDiff2 options\n\n\n"
+         "<#Uses 'pipe' with the second IDA instance to speed up graph display#Settings##Keep second IDB open :C>\n"
          "<#Saves PatchDiff2 results into the current IDB#Save results to IDB :C>>\n\n"
          ;
 
@@ -42,8 +41,8 @@ static bool idaapi pdiff_menu_callback(void *ud) {
    prev = opt->ipc;
 
    if (AskUsingForm_c(format, &option)) {
-      opt->ipc = !!(option & 1);
-      opt->save_db = !!(option & 2);
+      opt->ipc = (option & 1) == 1;
+      opt->save_db = (option & 2) == 2;
 
       if (prev && !option) {
          ipc_close();

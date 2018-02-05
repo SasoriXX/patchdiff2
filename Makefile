@@ -136,10 +136,6 @@ $(BINARY64): $(OBJDIR64) $(OBJS64)
 
 endif
 
-
-$(OUTDIR):
-	-@mkdir -p $(OUTDIR)
-
 backup.cpp: backup.h precomp.h sig.h diff.h options.h
 clist.cpp: clist.h precomp.h sig.h hash.cpp
 diff.cpp: diff.h precomp.h sig.h clist.h hash.h display.h backup.h options.h
