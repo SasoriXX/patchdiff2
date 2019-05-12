@@ -23,6 +23,10 @@
 #include "sig.h"
 #include "diff.h"
 
+#ifndef WOPN_MENU
+#define WOPN_MENU 0
+#endif
+
 #if IDA_SDK_VERSION >= 700
 typedef qlist<slist_t *> siginfo_list_t;
 static siginfo_list_t instances;
