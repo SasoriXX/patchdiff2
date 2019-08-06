@@ -258,6 +258,9 @@ void create_form_name(char (&dst)[len], slist_t *sl, int num) {
    qsnprintf(dst, len, "IDB%d: %s", num, sl->sigs[0]->name.c_str());
 }
 
+#if IDA_SDK_VERSION < 730
+#define WOPN_DP_TAB WOPN_TAB
+#endif
 
 /*------------------------------------------------*/
 /* function : pgraph_create                       */
@@ -322,7 +325,7 @@ static bool pgraph_create(slist_t *sl, int num) {
       if (widget) {                 //maybe testing widget is fine in both cases?
          sl->gv = create_graph_viewer(widget_name, id, graph_callback, sl, 0, widget);
          add_slist(sl);
-         display_widget(widget, WOPN_TAB | WOPN_MENU);
+         display_widget(widget, WOPN_DP_TAB | WOPN_MENU);
          if (sl->gv) {
             viewer_fit_window(sl->gv);
             viewer_attach_menu_item(sl->gv, PGRAPH_NAME);

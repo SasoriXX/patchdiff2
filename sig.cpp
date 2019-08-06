@@ -57,13 +57,23 @@ char *pget_func_name(ea_t ea, char * buffer, size_t blen) {
       return NULL;
    }
    qstrncpy(buffer, name.c_str(), blen);
-   dm_res = demangle_name2(&demangled, name.c_str(), inf.long_demnames);
+#if IDA_SDK_VERSION < 730
+   uint32 long_demnames = inf.long_demnames;
+#else
+   uint32 long_demnames = inf_get_long_demnames();
+#endif
+   dm_res = demangle_name2(&demangled, name.c_str(), long_demnames);
    if (dm_res >= 0) {
       if ( (demangled.find("public: static") != -1 || demangled.find("private: static") != -1) &&
          (demangled.find("(") == -1 || demangled.find("public: static long (__stdcall") == -1) ) {
           return NULL;
       }
-      dm_res = demangle_name2(&demangled, name.c_str(), inf.short_demnames);
+#if IDA_SDK_VERSION < 730
+      uint32 short_demnames = inf.short_demnames;
+#else
+      uint32 short_demnames = inf_get_short_demnames();
+#endif
+      dm_res = demangle_name2(&demangled, name.c_str(), short_demnames);
       qstrncpy(buffer, demangled.c_str(), blen);
    }
 #endif

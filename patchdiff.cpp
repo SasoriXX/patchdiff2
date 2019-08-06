@@ -36,15 +36,24 @@ cpu_t patchdiff_cpu;
 options_t * d_opt;
 
 static int idaapi init(void) {
-   if (!strcmp(inf.procName, "metapc")) {
-      if (inf.is_64bit()) {
+   char procname[256];
+   bool is64;
+#if IDA_SDK_VERSION < 730
+   strncpy(procname, inf.procname, sizeof(procname));
+   is64 = inf.is_64bit();
+#else
+   inf_get_procname(procname, sizeof(procname));
+   is64 = inf_is_64bit();
+#endif
+   if (!strcmp(procname, "metapc")) {
+      if (is64) {
          patchdiff_cpu = CPU_X8664;
       }
       else {
          patchdiff_cpu = CPU_X8632;
       }
    }
-   else if (!strcmp(inf.procName, "PPC")) {
+   else if (!strcmp(procname, "PPC")) {
       patchdiff_cpu = CPU_PPC;
    }
    else {
