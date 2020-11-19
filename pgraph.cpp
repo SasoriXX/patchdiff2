@@ -136,7 +136,7 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
 
             if (sl->sigs[s->node]->msig != NULL && sl->msl->gv != NULL) {
                viewer_center_on(sl->msl->gv, find_node(sl->msl, sl->sigs[s->node]->matchedEA));
-               }
+            }
             sl->dclk = false;
          }
          else if ( sl->dclk || s ) {
