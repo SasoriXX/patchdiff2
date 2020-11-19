@@ -108,10 +108,10 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
          }
       }
       break;
-
+#if IDA_SDK_VERSION < 740
    case grcode_changed_current: {
          graph_viewer_t *v   = va_arg (va, graph_viewer_t *);
-         int node         = va_argi(va, int);
+         int node         = va_arg(va, int);
 
          if (node != -1) {
             slist_t *sl = (slist_t *)ud;
@@ -119,7 +119,7 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
          }
       }
       break;
-
+#endif
    case grcode_clicked: {
          slist_t *sl = (slist_t *)ud;
          sl->dclk = false;
@@ -136,7 +136,7 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
 
             if (sl->sigs[s->node]->msig != NULL && sl->msl->gv != NULL) {
                viewer_center_on(sl->msl->gv, find_node(sl->msl, sl->sigs[s->node]->matchedEA));
-            }
+               }
             sl->dclk = false;
          }
          else if ( sl->dclk || s ) {
