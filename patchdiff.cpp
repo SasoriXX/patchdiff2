@@ -39,7 +39,7 @@ static int idaapi init(void) {
    char procname[256];
    bool is64;
 #if IDA_SDK_VERSION < 730
-   strncpy(procname, inf.procname, sizeof(procname));
+   qstrncpy(procname, inf.procname, sizeof(procname));
    is64 = inf.is_64bit();
 #else
    inf_get_procname(procname, sizeof(procname));
