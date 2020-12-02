@@ -250,7 +250,13 @@ struct pgraph_action_handler_t : public action_handler_t {
    }
 };
 static pgraph_action_handler_t pgraph_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t pgraph_action = ACTION_DESC_LITERAL(PGRAPH_NAME, "Jump to code", &pgraph_action_handler, NULL, NULL, -1);
+#else
+static const action_desc_t pgraph_action = ACTION_DESC_LITERAL_PLUGMOD(PGRAPH_NAME, "Jump to code", &pgraph_action_handler,
+                                                                       pd_plugmod, NULL, NULL, -1);
+#endif
+
 #endif
 
 template<size_t len>

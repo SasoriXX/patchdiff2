@@ -2,6 +2,7 @@
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
+   Portions (c) 2018, Chris Eagle (Updates for IDA versions >= 6.7)
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 2 as 
@@ -593,7 +594,12 @@ struct munmatch_action_handler_t : public action_handler_t {
    }
 };
 static munmatch_action_handler_t munmatch_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t munmatch_action = ACTION_DESC_LITERAL(MUNMATCH_NAME, "Unmatch", &munmatch_action_handler, NULL, NULL, -1);
+#else
+static const action_desc_t munmatch_action = ACTION_DESC_LITERAL_PLUGMOD(MUNMATCH_NAME, "Unmatch", &munmatch_action_handler,
+                                                                         pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define IDENTICAL_NAME "patchdiff:identical"
 //-------------------------------------------------------------------------
@@ -627,7 +633,12 @@ struct identical_action_handler_t : public action_handler_t {
    }
 };
 static identical_action_handler_t identical_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t identical_action = ACTION_DESC_LITERAL(IDENTICAL_NAME, "Set as identical", &identical_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t identical_action = ACTION_DESC_LITERAL_PLUGMOD(IDENTICAL_NAME, "Set as identical", &identical_action_handler,
+//                                                                          pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define FLAGUNFLAG_NAME "patchdiff:flagunflag"
 //-------------------------------------------------------------------------
@@ -661,7 +672,12 @@ struct flagunflag_action_handler_t : public action_handler_t {
    }
 };
 static flagunflag_action_handler_t flagunflag_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t flagunflag_action = ACTION_DESC_LITERAL(FLAGUNFLAG_NAME, "Flag/unflag", &flagunflag_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t flagunflag_action = ACTION_DESC_LITERAL_PLUGMOD(FLAGUNFLAG_NAME, "Flag/unflag", &flagunflag_action_handler,
+//                                                                           pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define MSYM_NAME "patchdiff:msym"
 //-------------------------------------------------------------------------
@@ -695,7 +711,12 @@ struct msym_action_handler_t : public action_handler_t {
    }
 };
 static msym_action_handler_t msym_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t msym_action = ACTION_DESC_LITERAL(MSYM_NAME, "Import Symbol", &msym_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t msym_action = ACTION_DESC_LITERAL_PLUGMOD(MSYM_NAME, "Import Symbol", &msym_action_handler,
+//                                                                     pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define IUNMATCH_NAME "patchdiff:iunmatch"
 //-------------------------------------------------------------------------
@@ -728,7 +749,12 @@ struct iunmatch_action_handler_t : public action_handler_t {
    }
 };
 static iunmatch_action_handler_t iunmatch_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t iunmatch_action = ACTION_DESC_LITERAL(IUNMATCH_NAME, "Unmatch", &iunmatch_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t iunmatch_action = ACTION_DESC_LITERAL_PLUGMOD(IUNMATCH_NAME, "Unmatch", &iunmatch_action_handler,
+//                                                                         pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define ITOM_NAME "patchdiff:itom"
 //-------------------------------------------------------------------------
@@ -762,7 +788,12 @@ struct itom_action_handler_t : public action_handler_t {
    }
 };
 static itom_action_handler_t itom_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t itom_action = ACTION_DESC_LITERAL(ITOM_NAME, "Set as matched", &itom_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t itom_action = ACTION_DESC_LITERAL_PLUGMOD(ITOM_NAME, "Set as matched", &itom_action_handler,
+//                                                                     pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define ISYM_NAME "patchdiff:isym"
 //-------------------------------------------------------------------------
@@ -796,8 +827,12 @@ struct isym_action_handler_t : public action_handler_t {
    }
 };
 static isym_action_handler_t isym_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t isym_action = ACTION_DESC_LITERAL(ISYM_NAME, "Import symbol", &isym_action_handler, NULL, NULL, -1);
-
+#else
+//static const action_desc_t isym_action = ACTION_DESC_LITERAL_PLUGMOD(ISYM_NAME, "Import symbol", &isym_action_handler,
+//                                                                     pd_plugmod, NULL, NULL, -1);
+#endif
 
 #define MATCH_NAME "patchdiff:match"
 //-------------------------------------------------------------------------
@@ -831,7 +866,13 @@ struct match_action_handler_t : public action_handler_t {
    }
 };
 static match_action_handler_t match_action_handler;
+#if IDA_SDK_VERSION < 750
 static const action_desc_t match_action = ACTION_DESC_LITERAL(MATCH_NAME, "Set match", &match_action_handler, NULL, NULL, -1);
+#else
+//static const action_desc_t match_action = ACTION_DESC_LITERAL_PLUGMOD(MATCH_NAME, "Set match", &match_action_handler,
+//                                                                      pd_plugmod, NULL, NULL, -1);
+#endif
+
 #endif
 
 #if IDA_SDK_VERSION >= 700
@@ -848,7 +889,6 @@ static void idaapi desc_dlist(slist_t *sl, uint32 n, qstrvec_t *cols_) {
    cols[6].sprnt("%lx", sig->crc_hash);
    cols[7].sprnt("%lx", sig->msig->crc_hash);
 }
-
 
 //-------------------------------------------------------------------------
 struct matched_chooser_t : public chooser_t {
@@ -884,6 +924,8 @@ public:
       graph_match(eng, n + 1); //hack because pre-7.0 choosers index from 1
       return cbret_t(); // nothing changed
    }
+
+   virtual void idaapi closed();
    
 };
 
@@ -895,6 +937,25 @@ inline matched_chooser_t::matched_chooser_t(deng_t *eng_) :
 
 void idaapi matched_chooser_t::get_row(qstrvec_t *cols_, int *, chooser_item_attrs_t *, size_t n) const {
    desc_dlist(eng ? eng->mlist : NULL, n, cols_);
+}
+
+void idaapi matched_chooser_t::closed() {
+   close_window(eng);
+
+#if IDA_SDK_VERSION <= 695
+   TForm *form = find_tform(title_match);
+#else
+   TWidget *form = find_widget(title_match);
+#endif
+   if (form) {
+      detach_action_from_popup(form, MUNMATCH_NAME);
+   }
+   if (unregister_action(MUNMATCH_NAME)) {
+      msg("Unregistering %s success\n", MUNMATCH_NAME);
+   }
+   else {
+      msg("Unregistering %s failed\n", MUNMATCH_NAME);
+   }
 }
 
 static matched_chooser_t *matched_chooser;
@@ -979,10 +1040,12 @@ public:
    virtual cbret_t idaapi enter(size_t n) {
       psig_t *sig = ui_access_sig(eng->ulist, n + 1);  //hack because pre-7.0 choosers index from 1
       
-      if (sig->nfile == 1)
+      if (sig->nfile == 1) {
          jumpto(sig->startEA);
-      else
+      }
+      else {
          os_copy_to_clipboard(NULL);
+      }
 
       return cbret_t(); // nothing changed
    }
@@ -1064,9 +1127,9 @@ static void display_matched(deng_t *eng) {
    TWidget *form = find_widget(title_match);
 #endif
    attach_action_to_popup(form, NULL, MUNMATCH_NAME);
-   attach_action_to_popup(form, NULL, IDENTICAL_NAME);
-   attach_action_to_popup(form, NULL, FLAGUNFLAG_NAME);
-   attach_action_to_popup(form, NULL, MSYM_NAME);
+//   attach_action_to_popup(form, NULL, IDENTICAL_NAME);
+//   attach_action_to_popup(form, NULL, FLAGUNFLAG_NAME);
+//   attach_action_to_popup(form, NULL, MSYM_NAME);
 #endif
 }
 
@@ -1115,9 +1178,9 @@ static void display_identical(deng_t *eng) {
 #else
    TWidget *form = find_widget(title_identical);
 #endif
-   attach_action_to_popup(form, NULL, IUNMATCH_NAME);
-   attach_action_to_popup(form, NULL, ITOM_NAME);
-   attach_action_to_popup(form, NULL, ISYM_NAME);
+//   attach_action_to_popup(form, NULL, IUNMATCH_NAME);
+//   attach_action_to_popup(form, NULL, ITOM_NAME);
+//   attach_action_to_popup(form, NULL, ISYM_NAME);
 #endif
 }
 
@@ -1164,7 +1227,7 @@ static void display_unmatched(deng_t *eng) {
 #else
    TWidget *form = find_widget(title_unmatch);
 #endif
-   attach_action_to_popup(form, NULL, MATCH_NAME);
+//   attach_action_to_popup(form, NULL, MATCH_NAME);
 #endif
 }
 
@@ -1209,6 +1272,7 @@ void display_results(deng_t *_eng) {
 
 #if IDA_SDK_VERSION >= 670
    register_action(munmatch_action);
+/*
    register_action(identical_action);
    register_action(flagunflag_action);
    register_action(msym_action);
@@ -1216,6 +1280,7 @@ void display_results(deng_t *_eng) {
    register_action(itom_action);
    register_action(isym_action);
    register_action(match_action);
+*/
 #endif
 
    hook_to_notification_point(HT_UI, ui_callback, NULL);
@@ -1223,4 +1288,20 @@ void display_results(deng_t *_eng) {
    display_matched(eng);
    display_unmatched(eng);
    display_identical(eng);
+}
+
+void display_cleanup() {
+   unhook_from_notification_point(HT_UI, ui_callback);
+
+#if IDA_SDK_VERSION >= 700
+   if (matched_chooser != NULL) {
+      msg("Deleting matched_chooser\n");
+      delete matched_chooser;
+   }
+#endif
+
+//   detach_action_from_popup(form, IDENTICAL_NAME);
+//   detach_action_from_popup(form, FLAGUNFLAG_NAME);
+//   detach_action_from_popup(form, MSYM_NAME);
+
 }

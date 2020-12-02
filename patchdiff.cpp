@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "precomp.h"
 
 #include "sig.h"
@@ -35,7 +34,34 @@ deng_t * d_engine;
 cpu_t patchdiff_cpu;
 options_t * d_opt;
 
-static int idaapi init(void) {
+static void idaapi pd_term_common(void) {
+   display_cleanup();
+
+   TWidget *form = find_widget(title_match);
+   if (form) {
+      close_widget(form, 0);
+   }
+   form = find_widget(title_unmatch);
+   if (form) {
+      close_widget(form, 0);
+   }
+   form = find_widget(title_identical);
+   if (form) {
+      close_widget(form, 0);
+   }
+
+   if (d_engine) {
+      if (options_save_db(d_opt)) {
+         backup_save_results(d_engine);
+      }
+      diff_engine_free(d_engine);
+   }
+
+   ipc_close();
+   options_close(d_opt);
+}
+
+static int idaapi pd_init_common(void) {
    char procname[256];
    bool is64;
 #if IDA_SDK_VERSION < 730
@@ -61,31 +87,17 @@ static int idaapi init(void) {
    }
 
    d_engine = NULL;
-   
+
    // handle IPC
    ipc_init(NULL, 0, 0);
 
    d_opt = options_init();
    if (!d_opt) {
-      return PLUGIN_SKIP;
+      return 0;
    }
 
-   return PLUGIN_OK;
+   return 1;
 }
-
-static void idaapi term(void) {
-   if (d_engine) {
-      if (options_save_db(d_opt)) {
-         backup_save_results(d_engine);
-      }
-      diff_engine_free(d_engine);
-      unhook_from_notification_point(HT_UI, ui_callback);
-   }
-
-   ipc_close();
-   options_close(d_opt);
-}
-
 
 static void run_first_instance() {
    char *file;
@@ -144,7 +156,6 @@ static void run_first_instance() {
    }
 }
 
-
 static void run_second_instance(const char * options) {
    slist_t * sl;
    char file[QMAXPATH];
@@ -154,10 +165,10 @@ static void run_second_instance(const char * options) {
    unsigned int v;
    bool cont;
    char tmp[QMAXPATH*4];
-   
+
    qsscanf(options, "%lu:%a:%u:%s", &id, &ea, &v, file);
    opt = (unsigned char)v;
-   
+
    if (id) {
       if (ipc_init(file, 2, id)) {
          do {
@@ -180,18 +191,14 @@ static void run_second_instance(const char * options) {
       if (!sl) {
          return;
       }
-      
+
       siglist_save(sl, file);
 
       siglist_free(sl);
    }
 }
 
-#if IDA_SDK_VERSION < 700
-static void idaapi run(int arg) {
-#else
-static bool idaapi run(size_t arg) {
-#endif
+static bool idaapi pd_run_common(size_t arg) {
    const char * options = NULL;
 
    autoWait();
@@ -205,11 +212,72 @@ static bool idaapi run(size_t arg) {
       run_second_instance(options);
    }
 
+   return true;
+}
+
+#if IDA_SDK_VERSION < 750
+
+//make life easier in a post 7.5 world
+#define PLUGIN_MULTI 0
+
+static int idaapi pd_init(void) {
+   if (pd_init_common()) {
+      return PLUGIN_KEEP;
+   }
+   else {
+      return PLUGIN_SKIP;
+   }
+}
+
+static void idaapi pd_term(void) {
+   pd_term_common();
+}
+
+#if IDA_SDK_VERSION < 700
+static void idaapi pd_run(int arg) {
+#else
+static bool idaapi pd_run(size_t arg) {
+#endif
+   pd_run_common(arg);
 #if IDA_SDK_VERSION >= 700
    return true;
 #endif
 }
 
+#else // >= 750
+
+#define pd_run NULL
+#define pd_term NULL
+
+pd_plugmod_t *pd_plugmod;
+
+struct pd_plugmod_t : public plugmod_t {
+  /// Invoke the plugin.
+  virtual bool idaapi run(size_t arg);
+
+  /// Virtual destructor.
+  virtual ~pd_plugmod_t();
+};
+
+plugmod_t *idaapi pd_init(void) {
+   if (pd_init_common()) {
+      pd_plugmod = new pd_plugmod_t();
+      return pd_plugmod;
+   }
+   else {
+      return NULL;
+   }
+}
+
+pd_plugmod_t::~pd_plugmod_t(void) {
+   pd_term_common();
+}
+
+bool idaapi pd_plugmod_t::run(size_t arg) {
+   return pd_run_common(arg);
+}
+
+#endif
 
 char comment[] = "w00t";
 char help[] = "A Binary Difference Analysis plugin module\n";
@@ -218,10 +286,10 @@ char wanted_hotkey[] = "Ctrl-8";
 
 plugin_t PLUGIN = {
    IDP_INTERFACE_VERSION,
-   PLUGIN_MOD | PLUGIN_PROC,
-   init,
-   term,
-   run,
+   PLUGIN_MOD | PLUGIN_MULTI,
+   pd_init,
+   pd_term,
+   pd_run,
    comment,
    help,
    wanted_name,

@@ -66,7 +66,13 @@ struct options_action_handler_t : public action_handler_t {
    }
 };
 static options_action_handler_t options_action_handler;
-//static const action_desc_t options_action = ACTION_DESC_LITERAL(OPTIONS_NAME, "Patchdiff2", &options_action_handler, NULL, NULL, -1);
+#if IDA_SDK_VERSION < 750
+static const action_desc_t options_action = ACTION_DESC_LITERAL(OPTIONS_NAME, "Patchdiff2", &options_action_handler, NULL, NULL, -1);
+#else
+static const action_desc_t options_action = ACTION_DESC_LITERAL_PLUGMOD(OPTIONS_NAME, "Patchdiff2", &options_action_handler,
+                                                                        pd_plugmod, NULL, NULL, -1);
+#endif
+
 #endif
 
 options_t *options_init() {
@@ -93,11 +99,18 @@ options_t *options_init() {
 
 #if IDA_SDK_VERSION <= 660
    add_menu_item("Options/", "PatchDiff2", NULL, SETMENU_APP, pdiff_menu_callback, opts);
-#else
+#elif IDA_SDK_VERSION < 750
    register_and_attach_to_menu(
           "Options/Setup", OPTIONS_NAME, "PatchDiff2",
           NULL, SETMENU_APP | SETMENU_CTXIDA,
           &options_action_handler, &PLUGIN);
+#else
+/*
+   register_and_attach_to_menu(
+          "Options/Setup", OPTIONS_NAME, "PatchDiff2",
+          NULL, SETMENU_APP | SETMENU_CTXIDA,
+          &options_action_handler, pd_plugmod, ADF_OT_PLUGMOD);
+*/
 #endif
   
    return opts;
@@ -108,7 +121,8 @@ void options_close(options_t *opt) {
 #if IDA_SDK_VERSION <= 660
    del_menu_item("Options/PatchDiff2");
 #else
-   unregister_action(OPTIONS_NAME);
+//   detach_action_from_menu("Options/Setup", OPTIONS_NAME);
+//   unregister_action(OPTIONS_NAME);
 #endif
    if (opts) qfree(opts);
    opts = NULL;

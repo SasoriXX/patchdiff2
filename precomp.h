@@ -159,5 +159,11 @@ static_assert(IDA_SDK_VERSION >= 650, "This plugin expects a minimum IDA SDK 6.5
 */
 #endif
 
+#if IDA_SDK_VERSION >= 750
+
+struct pd_plugmod_t;
+extern pd_plugmod_t *pd_plugmod;
+
+#endif
 
 #endif

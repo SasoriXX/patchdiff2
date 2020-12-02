@@ -71,6 +71,8 @@ static const char* title_identical = "Identical Functions";
 
 void display_results(deng_t *);
 
+void display_cleanup();
+
 #if IDA_SDK_VERSION < 700
 int idaapi ui_callback(void *data, int event_id, va_list va);
 #else
