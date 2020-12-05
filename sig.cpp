@@ -446,12 +446,12 @@ char get_byte_with_optimization(ea_t ea) {
       return ppc_get_byte(ea);
    default: {
 #if IDA_SDK_VERSION >= 700
-         insn_t cmd;
-         decode_insn(&cmd, ea);
+      insn_t cmd;
+      decode_insn(&cmd, ea);
 #else
-         decode_insn(ea);
+      decode_insn(ea);
 #endif
-         return (char)cmd.itype;
+      return (char)cmd.itype;
       }
    }
 }

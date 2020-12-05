@@ -1,21 +1,20 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #include "precomp.h"
 
@@ -27,9 +26,8 @@ using namespace std;
 
 extern cpu_t patchdiff_cpu;
 
-
 ea_t get_fake_jump(ea_t ea) {
-   switch(patchdiff_cpu) {
+   switch (patchdiff_cpu) {
    case CPU_X8632:
    case CPU_X8664:
       return x86_get_fake_jump(ea);
@@ -38,9 +36,8 @@ ea_t get_fake_jump(ea_t ea) {
    }
 }
 
-
 bool is_end_block(ea_t ea) {
-   switch(patchdiff_cpu) {
+   switch (patchdiff_cpu) {
    case CPU_X8632:
    case CPU_X8664:
       return x86_is_end_block(ea);
@@ -61,7 +58,7 @@ ea_t get_direct_jump(ea_t ea) {
    if (!xb.iscode || !(cr == fl_JF || cr == fl_JN || cr == fl_F) || (f & FF_JUMP)) {
       return BADADDR;
    }
-   switch(patchdiff_cpu) {
+   switch (patchdiff_cpu) {
    case CPU_X8632:
    case CPU_X8664:
       if (x86_is_direct_jump(ea)) {
@@ -71,7 +68,6 @@ ea_t get_direct_jump(ea_t ea) {
       return BADADDR;
    }
 }
-
 
 bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & bl) {
    xrefblk_t xb;
@@ -102,7 +98,7 @@ bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & 
             j = true;
             type = 1;
          }
-         else if (! (f & FF_JUMP)) {
+         else if (!(f & FF_JUMP)) {
             flow = true;
             type = 2;
          }
@@ -134,7 +130,7 @@ bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & 
 
             // TODO: We hit this assert.
             assert(ed.type != 0);
-            
+
             tmp.insert(pos, ed);
          }
       }
@@ -152,7 +148,7 @@ bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & 
    }
 
    if (j) {
-      for (k=0; k<tmp.size(); k++) {
+      for (k = 0; k < tmp.size(); k++) {
          pedge_t ed;
 
          ed.ea = tmp[k].ea;
@@ -173,7 +169,6 @@ bool pflow_chart_t::getJump(func_t *fct, qvector<ea_t> & list, pbasic_block_t & 
 
    return false;
 }
-
 
 bool pflow_chart_t::check_address(ea_t ea) {
    qvector<pbasic_block_t>::iterator it;
@@ -203,10 +198,8 @@ bool pflow_chart_t::check_address(ea_t ea) {
       }
    }
 
-
    return false;
 }
-
 
 pflow_chart_t::pflow_chart_t(func_t *fct) {
    ea_t ea;
@@ -233,10 +226,10 @@ pflow_chart_t::pflow_chart_t(func_t *fct) {
          ea = bl.endEA;
          f = getFlags(ea);
 
-         if ( (!isFlow(f) && (ea != bl.startEA)) || !isCode(f) ) {
+         if ((!isFlow(f) && (ea != bl.startEA)) || !isCode(f)) {
             break;
          }
-         if ( check_address(ea) ) {
+         if (check_address(ea)) {
             pedge_t ed;
 
             ed.ea = ea;
@@ -246,10 +239,10 @@ pflow_chart_t::pflow_chart_t(func_t *fct) {
             break;
          }
 
-         if ( getJump(fct, to_trace, bl) ) {
+         if (getJump(fct, to_trace, bl)) {
             cont = false;
          }
-         if ( is_end_block(ea) ) {
+         if (is_end_block(ea)) {
             break;
          }
          bl.endEA = get_item_end(ea);

@@ -1,3 +1,7 @@
+PatchDiff v2.0.12:
+
+* Update to build/run with IDA versions >= 6.7 (through 7.5)
+
 PatchDiff v2.0.11:
 
 * Update to build/run with IDA versions >= 6.7 (through 7.0)

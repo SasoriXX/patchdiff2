@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef __PPC_H__
 #define __PPC_H__
 

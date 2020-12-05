@@ -23,7 +23,12 @@ enum cpu_t {
    CPU_DEFAULT,
    CPU_X8632,
    CPU_X8664,
-   CPU_PPC
+   CPU_PPC,
+   CPU_PPC64,
+   CPU_MIPS,
+   CPU_MIPS64,
+   CPU_ARM,
+   CPU_AARCH64
 };
 
 #endif

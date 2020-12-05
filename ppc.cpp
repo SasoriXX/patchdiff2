@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "precomp.h"
 
 #include "ppc.h"
@@ -67,7 +66,6 @@ bool ppc_is_nop (unsigned char _byte, ea_t ea) {
    return false;
 }
 
-
 /*------------------------------------------------*/
 /* function : ppc_remove_instr                    */
 /* arguments: unsigned char byte, ea_t ea         */
@@ -110,7 +108,7 @@ unsigned char ppc_get_byte(ea_t ea) {
    byte = get_byte(ea) >> 2;
 
    if (byte == 31) {
-      v = get_word(ea+2);
+      v = get_word(ea + 2);
       v = (v >> 1) & 0xFF;
       if (v < 65) v += 65;
 

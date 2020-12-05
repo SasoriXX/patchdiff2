@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef __PCHART_H__
 #define __PCHART_H__
 
@@ -49,28 +48,29 @@ public:
    idaapi pflow_chart_t(func_t *_pfn);
 
    int idaapi nsucc(int node) const { return int(blocks[node].succ.size()); }
-   int idaapi succ(int node, int i) const
-   {
+   int idaapi succ(int node, int i) const {
       int k;
 
-      for (k=0; k<nproper; k++)
-         if (blocks[k].startEA == blocks[node].succ[i].ea)
+      for (k = 0; k < nproper; k++) {
+         if (blocks[k].startEA == blocks[node].succ[i].ea) {
             return k;
+         }
+      }
 
       return -1;
    }
    //int idaapi npred(int node) const { return (int)blocks[node].pred.size(); }
    int idaapi npred(int) const { return 0; }
-   int idaapi pred(int node, int i) const
-   {
+   int idaapi pred(int node, int i) const {
       return -1;
 
       int k;
 
-      for (k=0; k<nproper; k++)
-         if (blocks[k].startEA == blocks[node].pred[i].ea)
+      for (k = 0; k < nproper; k++) {
+         if (blocks[k].startEA == blocks[node].pred[i].ea) {
             return k;
-
+         }
+      }
       return -1;
    }
 };

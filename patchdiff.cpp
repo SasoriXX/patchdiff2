@@ -94,7 +94,7 @@ void pd_plugmod_t::run_first_instance() {
    int ret;
 
    msg ("\n---------------------------------------------------\n"
-      "PatchDiff Plugin v2.0.11\n"
+      "PatchDiff Plugin v2.0.12\n"
       "Copyright (c) 2010-2011, Nicolas Pouvesle\n"
       "Copyright (C) 2007-2009, Tenable Network Security, Inc\n"
       "Copyright (c) 2018, Chris Eagle (Updates for IDA versions >= 6.7)\n"
