@@ -16,22 +16,21 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef __OPTIONS_H__
 #define __OPTIONS_H__
 
+struct pd_plugmod_t;
 
-struct p_options {
+struct options_t {
    bool ipc;   // inter process communication
    bool save_db;
+
+   options_t(pd_plugmod_t *);
+   ~options_t();
+
+   bool options_use_ipc();
+   bool options_save_db();
+
 };
-
-typedef struct p_options options_t;
-
-
-options_t * options_init();
-bool options_use_ipc(options_t *);
-bool options_save_db(options_t *);
-void options_close(options_t *);
 
 #endif

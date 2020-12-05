@@ -1,25 +1,25 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #pragma once
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stack>
 
 #define NO_OBSOLETE_FUNCS
@@ -44,7 +44,6 @@
 #else
 #include <area.hpp>
 #endif
-
 
 // The graph API spams "forcing value to bool" warnings...
 #pragma warning(push)
@@ -154,7 +153,7 @@ static_assert(IDA_SDK_VERSION >= 650, "This plugin expects a minimum IDA SDK 6.5
 #define ev_del_cref del_cref
 #define ev_del_dref del_dref
 #define ev_auto_queue_empty auto_queue_empty
-#define set_func_start func_setstart 
+#define set_func_start func_setstart
 #define set_func_end func_setend
 */
 #endif

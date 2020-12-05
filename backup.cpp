@@ -16,14 +16,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "precomp.h"
 
 #include "sig.h"
 #include "diff.h"
 #include "options.h"
 #include "backup.h"
-
 
 static void buffer_serialize_data(char *buf, size_t blen, size_t *pos, void *data, size_t dsize) {
    if ( (*pos + dsize) > blen) {
@@ -35,7 +33,6 @@ static void buffer_serialize_data(char *buf, size_t blen, size_t *pos, void *dat
    *pos += dsize;
 }
 
-
 static void buffer_unserialize_data(char *buf, size_t blen, size_t *pos, void *data, size_t dsize) {
    if ( (*pos + dsize) > blen) {
       *pos = blen;
@@ -46,66 +43,53 @@ static void buffer_unserialize_data(char *buf, size_t blen, size_t *pos, void *d
    *pos += dsize;
 }
 
-
 static void buffer_serialize_ea(char *buf, size_t blen, size_t *pos, ea_t ea) {
    buffer_serialize_data(buf, blen, pos, &ea, sizeof(ea));
 }
-
 
 static void buffer_serialize_bool(char *buf, size_t blen, size_t *pos, bool b) {
    buffer_serialize_data(buf, blen, pos, &b, sizeof(b));
 }
 
-
 static void buffer_serialize_char(char *buf, size_t blen, size_t *pos, char c) {
    buffer_serialize_data(buf, blen, pos, &c, sizeof(c));
 }
-
 
 static void buffer_serialize_int(char *buf, size_t blen, size_t *pos, int i) {
    buffer_serialize_data(buf, blen, pos, &i, sizeof(i));
 }
 
-
-static void buffer_serialize_long(char *buf, size_t blen, size_t *pos, unsigned long l) {
+static void buffer_serialize_uint32(char *buf, size_t blen, size_t *pos, uint32_t l) {
    buffer_serialize_data(buf, blen, pos, &l, sizeof(l));
 }
-
 
 static void buffer_serialize_size(char *buf, size_t blen, size_t *pos, size_t size) {
    buffer_serialize_data(buf, blen, pos, &size, sizeof(size));
 }
 
-
 static void buffer_unserialize_ea(char *buf, size_t blen, size_t *pos, ea_t *ea) {
    buffer_unserialize_data(buf, blen, pos, ea, sizeof(*ea));
 }
-
 
 static void buffer_unserialize_bool(char *buf, size_t blen, size_t *pos, bool *b) {
    buffer_unserialize_data(buf, blen, pos, b, sizeof(*b));
 }
 
-
 static void buffer_unserialize_char(char *buf, size_t blen, size_t *pos, char *c) {
    buffer_unserialize_data(buf, blen, pos, c, sizeof(*c));
 }
-
 
 static void buffer_unserialize_int(char *buf, size_t blen, size_t *pos, int *i) {
    buffer_unserialize_data(buf, blen, pos, i, sizeof(*i));
 }
 
-
-static void buffer_unserialize_long(char *buf, size_t blen, size_t *pos, unsigned long *l) {
+static void buffer_unserialize_uint32(char *buf, size_t blen, size_t *pos, uint32_t *l) {
    buffer_unserialize_data(buf, blen, pos, l, sizeof(*l));
 }
-
 
 static void buffer_unserialize_size(char *buf, size_t blen, size_t *pos, size_t *size) {
    buffer_unserialize_data(buf, blen, pos, size, sizeof(*size));
 }
-
 
 /*------------------------------------------------*/
 /* function : buffer_serialize_string             */
@@ -153,13 +137,12 @@ static void buffer_unserialize_string(char *buf, size_t blen, size_t *pos, qstri
    *pos += s.length() + 1;
 }
 
-
 /*------------------------------------------------*/
 /* function : singleton_serialize                 */
 /* description: Serializes a signature            */
 /*------------------------------------------------*/
 
-static size_t singleton_serialize(char *buf, size_t blen, psig_t *s, int nfile) {
+static size_t singleton_serialize(char *buf, size_t blen, sig_t *s, int nfile) {
    size_t pos = 0;
    fref_t *fref = NULL;
    int num, i;
@@ -171,12 +154,12 @@ static size_t singleton_serialize(char *buf, size_t blen, psig_t *s, int nfile) 
    buffer_serialize_int(buf, blen, &pos, s->id_crc);
    buffer_serialize_int(buf, blen, &pos, nfile);
 
-   buffer_serialize_long(buf, blen, &pos, s->sig);
-   buffer_serialize_long(buf, blen, &pos, s->hash);
-   buffer_serialize_long(buf, blen, &pos, s->crc_hash);
-   buffer_serialize_long(buf, blen, &pos, s->str_hash);
+   buffer_serialize_uint32(buf, blen, &pos, s->sig);
+   buffer_serialize_uint32(buf, blen, &pos, s->hash);
+   buffer_serialize_uint32(buf, blen, &pos, s->crc_hash);
+   buffer_serialize_uint32(buf, blen, &pos, s->str_hash);
    buffer_serialize_int(buf, blen, &pos, s->flag);
-   buffer_serialize_long(buf, blen, &pos, s->lines);
+   buffer_serialize_uint32(buf, blen, &pos, s->lines);
 
    num= 0;
    if (s->srefs) {
@@ -205,13 +188,12 @@ static size_t singleton_serialize(char *buf, size_t blen, psig_t *s, int nfile) 
    return pos;
 }
 
-
 /*------------------------------------------------*/
 /* function : singleton_unserialize                 */
 /* description: Serializes a signature            */
 /*------------------------------------------------*/
 
-static size_t singleton_unserialize(char *buf, size_t blen, psig_t **s, int version) {
+static size_t singleton_unserialize(char *buf, size_t blen, sig_t **s, int version) {
    char tmp[512];
    size_t pos = 0;
    char c;
@@ -219,7 +201,7 @@ static size_t singleton_unserialize(char *buf, size_t blen, psig_t **s, int vers
    ea_t ea;
    int type;
 
-   *s = sig_init();
+   *s = new sig_t();
    if (!(*s)) {
       return 0;
    }
@@ -230,30 +212,29 @@ static size_t singleton_unserialize(char *buf, size_t blen, psig_t **s, int vers
    buffer_unserialize_int(buf, blen, &pos, &(*s)->id_crc);
    buffer_unserialize_int(buf, blen, &pos, &(*s)->nfile);
 
-   buffer_unserialize_long(buf, blen, &pos, &(*s)->sig);
-   buffer_unserialize_long(buf, blen, &pos, &(*s)->hash);
-   buffer_unserialize_long(buf, blen, &pos, &(*s)->crc_hash);
-   
+   buffer_unserialize_uint32(buf, blen, &pos, &(*s)->sig);
+   buffer_unserialize_uint32(buf, blen, &pos, &(*s)->hash);
+   buffer_unserialize_uint32(buf, blen, &pos, &(*s)->crc_hash);
+
    if (version >= 2) {
-      buffer_unserialize_long(buf, blen, &pos, &(*s)->str_hash);
+      buffer_unserialize_uint32(buf, blen, &pos, &(*s)->str_hash);
    }
    if (version >= 3) {
       buffer_unserialize_int(buf, blen, &pos, &(*s)->flag);
    }
-   buffer_unserialize_long(buf, blen, &pos, &(*s)->lines);
+   buffer_unserialize_uint32(buf, blen, &pos, &(*s)->lines);
 
    buffer_unserialize_int(buf, blen, &pos, &num);
    for (i = 0; i < num; i++) {
       buffer_unserialize_ea(buf, blen, &pos, &ea);
       buffer_unserialize_int(buf, blen, &pos, &type);
 
-      sig_add_sref(*s, ea, type, CHECK_REF);
+      (*s)->add_sref(ea, type, CHECK_REF);
    }
-
 
    if ((*s)->nfile == 2) {
       buffer_unserialize_char(buf, blen, &pos, &c);
-      
+
       if (c == 1) {
          buffer_unserialize_string(buf, blen, &pos, (*s)->name);
       }
@@ -263,12 +244,11 @@ static size_t singleton_unserialize(char *buf, size_t blen, psig_t **s, int vers
    }
    else {
       pget_func_name((*s)->startEA, tmp, sizeof(tmp));
-      sig_set_name(*s, tmp);
+      (*s)->set_name(tmp);
    }
 
    return pos;
 }
-
 
 /*------------------------------------------------*/
 /* function : pair_serialize                      */
@@ -276,7 +256,7 @@ static size_t singleton_unserialize(char *buf, size_t blen, psig_t **s, int vers
 /*              matched signature                 */
 /*------------------------------------------------*/
 
-static size_t pair_serialize(char *buf, size_t blen, psig_t *s) {
+static size_t pair_serialize(char *buf, size_t blen, sig_t *s) {
    size_t len;
 
    len = singleton_serialize(buf, blen, s, 1);
@@ -285,14 +265,13 @@ static size_t pair_serialize(char *buf, size_t blen, psig_t *s) {
    return len;
 }
 
-
 /*------------------------------------------------*/
 /* function : pair_unserialize                    */
 /* description: Unserializes a signature and the  */
 /*              matched signature                 */
 /*------------------------------------------------*/
 
-static size_t pair_unserialize(char *buf, size_t blen, psig_t **s, int version) {
+static size_t pair_unserialize(char *buf, size_t blen, sig_t **s, int version) {
    size_t len;
 
    len = singleton_unserialize(buf, blen, s, version);
@@ -302,7 +281,6 @@ static size_t pair_unserialize(char *buf, size_t blen, psig_t **s, int version) 
 
    return len;
 }
-
 
 /*------------------------------------------------*/
 /* function : backup_save_list                    */
@@ -343,7 +321,6 @@ static void backup_save_list(const char *node_name, slist_t *sl) {
    }
 }
 
-
 /*------------------------------------------------*/
 /* function : backup_load_list                    */
 /* description: Loads result list from a netnode  */
@@ -367,7 +344,7 @@ static bool backup_load_list(const char *node_name, slist_t *sl, int type, int v
          msg("backup failed: netnode does not exist !!\n");
          return false;
       }
-      
+
       netnode n(nidx);
 
       len = sizeof(buf);
@@ -388,7 +365,6 @@ static bool backup_load_list(const char *node_name, slist_t *sl, int type, int v
 
    return true;
 }
-
 
 /*------------------------------------------------*/
 /* function : backup_free_node                    */
@@ -411,7 +387,6 @@ static void backup_free_node(const char *node_name, size_t size) {
    node.kill();
 }
 
-
 /*------------------------------------------------*/
 /* function : backup_cleanup                      */
 /* description: Removes results from the IDB      */
@@ -425,7 +400,6 @@ static void backup_cleanup(deng_t *eng) {
    backup_free_node("$ pdiff2_eng", 1);
 }
 
-
 /*------------------------------------------------*/
 /* function : backup_save_eng                     */
 /* description:Saves engine data inside a netnode */
@@ -433,7 +407,7 @@ static void backup_cleanup(deng_t *eng) {
 
 static void backup_save_eng(const char *node_name, deng_t *eng) {
    char buf[1000];
-   char *file;
+   const char *file;
    size_t pos = 0;
    netnode node;
    size_t msize, isize, usize;
@@ -481,7 +455,6 @@ static void backup_save_eng(const char *node_name, deng_t *eng) {
    n.setblob(buf, pos, 0, 'P');
 }
 
-
 /*------------------------------------------------*/
 /* function : backup_load_file                    */
 /* description:Loads engine data inside a netnode */
@@ -508,7 +481,7 @@ static deng_t *backup_load_eng(const char *node_name, options_t *opt, int *versi
    if (!blen) {
       return NULL;
    }
-   eng = (deng_t *)qalloc(sizeof(*eng));
+   eng = new deng_t(opt);
    if (!eng) {
       return NULL;
    }
@@ -527,13 +500,12 @@ static deng_t *backup_load_eng(const char *node_name, options_t *opt, int *versi
    // no need to save that in the IDB
    eng->opt->save_db = true;
 
-   eng->mlist = siglist_init(msize, file);
-   eng->ilist = siglist_init(isize, file);
-   eng->ulist = siglist_init(usize, file);
+   eng->mlist = new slist_t(msize, file);
+   eng->ilist = new slist_t(isize, file);
+   eng->ulist = new slist_t(usize, file);
 
    return eng;
 }
-
 
 /*------------------------------------------------*/
 /* function : backup_save_results                 */
@@ -549,7 +521,6 @@ void backup_save_results(deng_t *eng) {
    backup_save_list("$ pdiff2_unmatched", eng->ulist);
 }
 
-
 /*------------------------------------------------*/
 /* function : backup_load_results                 */
 /* description: Loads diff results from the IDB   */
@@ -564,13 +535,12 @@ int backup_load_results(deng_t **eng, options_t *opt) {
                   "Previous diff results have been found. Please specify the action to perform.");
 
       if (ret == 0) {
-         diff_engine_free(*eng);
+         delete *eng;
          *eng = NULL;
       }
 
       return ret;
    }
-
 
    *eng = backup_load_eng("$ pdiff2_eng", opt, &version);
    if (!(*eng)) {
@@ -597,7 +567,7 @@ int backup_load_results(deng_t **eng, options_t *opt) {
    return ret;
 
 error:
-   diff_engine_free(*eng);
+   delete *eng;
    *eng = NULL;
 
    return ret;

@@ -1,17 +1,17 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -31,7 +31,7 @@ struct pedge_t {
 struct pbasic_block_t : public area_t {
 #else
 struct pbasic_block_t : public range_t {
-#endif   
+#endif
   qvector<pedge_t> succ; // list of node successors
   qvector<pedge_t> pred; // list of node predecessors
 };
@@ -49,8 +49,8 @@ public:
    idaapi pflow_chart_t(func_t *_pfn);
 
    int idaapi nsucc(int node) const { return int(blocks[node].succ.size()); }
-   int idaapi succ(int node, int i) const 
-   { 
+   int idaapi succ(int node, int i) const
+   {
       int k;
 
       for (k=0; k<nproper; k++)
@@ -62,7 +62,7 @@ public:
    //int idaapi npred(int node) const { return (int)blocks[node].pred.size(); }
    int idaapi npred(int) const { return 0; }
    int idaapi pred(int node, int i) const
-   { 
+   {
       return -1;
 
       int k;

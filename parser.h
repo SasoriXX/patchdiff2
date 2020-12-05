@@ -27,6 +27,6 @@
 slist_t * parse_idb();
 slist_t * parse_second_idb(char **, options_t *);
 slist_t * parse_fct(ea_t, char);
-slist_t * parse_second_fct(ea_t, char *, options_t *);
+slist_t * parse_second_fct(ea_t, const char *, options_t *);
 
 #endif

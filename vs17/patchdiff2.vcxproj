@@ -328,6 +328,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\actions.h" />
     <ClInclude Include="..\backup.h" />
     <ClInclude Include="..\clist.h" />
     <ClInclude Include="..\diff.h" />
@@ -339,6 +340,7 @@
     <ClInclude Include="..\patchdiff.h" />
     <ClInclude Include="..\pchart.h" />
     <ClInclude Include="..\pgraph.h" />
+    <ClInclude Include="..\plugin.h" />
     <ClInclude Include="..\ppc.h" />
     <ClInclude Include="..\precomp.h" />
     <ClInclude Include="..\sig.h" />

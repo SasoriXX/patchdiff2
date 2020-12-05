@@ -1,21 +1,20 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 // Must be included before idp.hpp
 #include <Windows.h>
@@ -23,7 +22,6 @@
 
 #include "win_fct.h"
 #include "system.h"
-
 
 struct ipc_data {
    HANDLE shared;
@@ -34,7 +32,6 @@ struct ipc_data {
 };
 
 typedef struct ipc_data ipc_data_t;
-
 
 
 /*------------------------------------------------*/
@@ -50,7 +47,7 @@ int os_execute_command(char *cmd, bool close, void *data) {
    ipc_data_t *id = (ipc_data_t *)data;
 
    ZeroMemory( &si, sizeof(STARTUPINFO) );
-   si.cb = sizeof(STARTUPINFO); 
+   si.cb = sizeof(STARTUPINFO);
    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
@@ -85,7 +82,6 @@ int os_execute_command(char *cmd, bool close, void *data) {
    return ret;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_check_process                    */
 /* description: checks process state              */
@@ -100,7 +96,6 @@ static bool os_check_process(void *handle) {
    return false;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_copy_to_clipboard                */
 /* description: Copies data to clipboard          */
@@ -108,7 +103,6 @@ static bool os_check_process(void *handle) {
 
 void os_copy_to_clipboard(char *data) {
 }
-
 
 /*------------------------------------------------*/
 /* function : os_get_pid                          */
@@ -119,7 +113,6 @@ long os_get_pid() {
    return (long)GetCurrentProcessId();
 }
 
-
 /*------------------------------------------------*/
 /* function : os_unlink                           */
 /* description: removes a link to a file          */
@@ -128,7 +121,6 @@ long os_get_pid() {
 int os_unlink(const char *path) {
    return _unlink(path);
 }
-
 
 /*------------------------------------------------*/
 /* function : os_tempnam                          */
@@ -143,7 +135,6 @@ void os_tempnam(char *data, size_t size, char *suffix) {
     GetTempFileName(tmp, NULL, 0, name);
     qsnprintf(data, size, "%s%s", name, (suffix) ? suffix: "");
 }
-
 
 /*------------------------------------------------*/
 /* function : os_ipc_send                         */
@@ -161,7 +152,6 @@ bool os_ipc_send(void *data, int type, idata_t *d) {
    return SetEvent(lock) == TRUE;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_ipc_recv                         */
 /* description: Receives data on pipe             */
@@ -173,11 +163,11 @@ bool os_ipc_recv(void *data, int type, idata_t *d) {
    DWORD ret;
 
    lock = (type == IPC_SERVER) ? id->rlock : id->slock;
-   
+
    if (id->process) {
       while (1) {
          ret = WaitForSingleObject((HANDLE)lock, 1000);
-         
+
          if (ret == WAIT_OBJECT_0) {
             break;
          }
@@ -198,7 +188,6 @@ bool os_ipc_recv(void *data, int type, idata_t *d) {
    return true;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_ipc_init                         */
 /* description: Inits interprocess communication  */
@@ -208,12 +197,12 @@ bool os_ipc_init(void ** data, long pid, int type) {
    char name[512];
    ipc_data_t *id;
 
-   id = (ipc_data_t *)qalloc(sizeof(*id));
+   id = new ipc_data_t();
    if (!id) {
       return false;
    }
    memset(id, '\0', sizeof(*id));
-   
+
    qsnprintf(name, sizeof(name), "pdiff2_slock%u", pid);
    id->slock = CreateEvent(NULL, false, false, name);
    if (!id->slock) {
@@ -257,10 +246,9 @@ error:
    if (id->shared) {
       CloseHandle(id->shared);
    }
-   qfree(id);
+   delete id;
    return false;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_ipc_close                        */
@@ -289,7 +277,6 @@ bool os_ipc_close(void *data) {
    }
    return true;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_get_pref_int                     */

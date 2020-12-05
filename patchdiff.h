@@ -16,19 +16,14 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef __PATCHDIFF_H__
 #define __PATCHDIFF_H__
 
-
-enum pcpu_type {
+enum cpu_t {
    CPU_DEFAULT,
    CPU_X8632,
    CPU_X8664,
    CPU_PPC
 };
-
-typedef enum pcpu_type cpu_t;
-
 
 #endif

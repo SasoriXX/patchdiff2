@@ -1,27 +1,25 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #include "precomp.h"
 
 #include "hash.h"
 #include "sig.h"
-
 
 /*------------------------------------------------*/
 /* function : hash_init                           */
@@ -38,14 +36,14 @@ hpsig_t *hash_init(size_t num) {
          break;
       }
    }
-   hsig = (hpsig_t *)qalloc(sizeof(*hsig));
+   hsig = new hpsig_t();
    if (!hsig) {
       return NULL;
    }
    hsig->max_hash = primes[i];
-   hsig->table = (hsignature_t **) qalloc(hsig->max_hash * sizeof(*hsig->table));
+   hsig->table = new hsignature_t *[hsig->max_hash];
    if (!hsig->table) {
-      qfree(hsig);
+      delete hsig;
       return NULL;
    }
 
@@ -54,7 +52,6 @@ hpsig_t *hash_init(size_t num) {
    }
    return hsig;
 }
-
 
 /*------------------------------------------------*/
 /* function : hash_mk_ea                          */
@@ -81,17 +78,16 @@ unsigned int hash_mk_ea(hpsig_t *htable, ea_t val) {
    return h % htable->max_hash;
 }
 
-
 /*------------------------------------------------*/
 /* function : hash_add_ea                         */
 /* description: Adds element to the hash table    */
 /*------------------------------------------------*/
 
-int hash_add_ea (hpsig_t *htable, psig_t *sig) {
+int hash_add_ea (hpsig_t *htable, sig_t *sig) {
    int id = hash_mk_ea(htable, sig->startEA);
-   hsignature_t *hsig = NULL; 
+   hsignature_t *hsig = NULL;
 
-   hsig = (hsignature_t *)qalloc(sizeof(*hsig));
+   hsig = new hsignature_t();
    if (!hsig) {
       return -1;
    }
@@ -102,13 +98,12 @@ int hash_add_ea (hpsig_t *htable, psig_t *sig) {
    return 0;
 }
 
-
 /*------------------------------------------------*/
 /* function : hash_find_ea                        */
 /* description: Finds element in the hash table   */
 /*------------------------------------------------*/
 
-psig_t *hash_find_ea (hpsig_t *htable, ea_t ea) {
+sig_t *hash_find_ea (hpsig_t *htable, ea_t ea) {
    if (ea == BADADDR) {
       return NULL;
    }
@@ -127,7 +122,6 @@ psig_t *hash_find_ea (hpsig_t *htable, ea_t ea) {
    return NULL;
 }
 
-
 /*------------------------------------------------*/
 /* function : hash_free                           */
 /* description: Frees hash table                  */
@@ -142,12 +136,12 @@ void hash_free (hpsig_t *htable) {
 
       while (hsig != NULL) {
          tmp = hsig->next;
-         qfree (hsig);
+         delete hsig;
 
          hsig = tmp;
       }
    }
 
-   qfree(htable);
+   delete [] htable;
 }
 

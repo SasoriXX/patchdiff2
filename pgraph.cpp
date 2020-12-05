@@ -1,27 +1,27 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #include "precomp.h"
 
 #include "pgraph.h"
 #include "sig.h"
 #include "diff.h"
+#include "actions.h"
 
 #ifndef WOPN_MENU
 #define WOPN_MENU 0
@@ -65,7 +65,6 @@ static int find_node(slist_t *sl, ea_t ea) {
    return -1;
 }
 
-
 /*------------------------------------------------*/
 /* function : menu_callback                       */
 /* description: Menu callback                     */
@@ -84,7 +83,6 @@ static bool idaapi menu_callback(void *ud) {
 
    return true;
 }
-
 
 /*------------------------------------------------*/
 /* function : graph_callback                      */
@@ -166,8 +164,8 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
                fref = sl->sigs[i]->srefs->list;
                while(fref) {
                   int pos = find_node(sl, fref->ea);
-                  
-                  if (pos != -1) {               
+
+                  if (pos != -1) {
                      edge_info_t ed;
                      if (fref->type == 3) {
                         ed.color = 0xff0000;
@@ -234,28 +232,18 @@ static ssize_t idaapi graph_callback(void *ud, int code, va_list va) {
 }
 
 #if IDA_SDK_VERSION >= 700
-#define PGRAPH_NAME "patchdiff:pgraph"
 //-------------------------------------------------------------------------
-struct pgraph_action_handler_t : public action_handler_t {
-   virtual int idaapi activate(action_activation_ctx_t *ctx) {
-      slist_t *sl = find_slist((graph_viewer_t *) ctx->widget);
-      menu_callback(sl);
-      return 0;
-   }
+int idaapi pgraph_action_handler_t::activate(action_activation_ctx_t *ctx) {
+   slist_t *sl = find_slist((graph_viewer_t *) ctx->widget);
+   menu_callback(sl);
+   return 0;
+}
 
-   virtual action_state_t idaapi update(action_update_ctx_t *ctx) {
-      return find_slist((graph_viewer_t *) ctx->widget) != NULL
-               ? AST_ENABLE_FOR_WIDGET
-               : AST_DISABLE_FOR_WIDGET;
-   }
-};
-static pgraph_action_handler_t pgraph_action_handler;
-#if IDA_SDK_VERSION < 750
-static const action_desc_t pgraph_action = ACTION_DESC_LITERAL(PGRAPH_NAME, "Jump to code", &pgraph_action_handler, NULL, NULL, -1);
-#else
-static const action_desc_t pgraph_action = ACTION_DESC_LITERAL_PLUGMOD(PGRAPH_NAME, "Jump to code", &pgraph_action_handler,
-                                                                       pd_plugmod, NULL, NULL, -1);
-#endif
+action_state_t idaapi pgraph_action_handler_t::update(action_update_ctx_t *ctx) {
+   return find_slist((graph_viewer_t *) ctx->widget) != NULL
+            ? AST_ENABLE_FOR_WIDGET
+            : AST_DISABLE_FOR_WIDGET;
+}
 
 #endif
 
@@ -283,7 +271,7 @@ static bool pgraph_create(slist_t *sl, int num) {
 
    create_form_name(form_name, sl, num);
    qsnprintf(node_name, sizeof(node_name), "$ %s", form_name);
-   
+
    form = find_tform(form_name);
 
    netnode id;
@@ -301,7 +289,7 @@ static bool pgraph_create(slist_t *sl, int num) {
          open_tform(form, FORM_TAB | FORM_MENU | FORM_QWIDGET);
          if (sl->gv) {
             viewer_fit_window(sl->gv);
-            viewer_add_menu_item(sl->gv, "Jump to code", menu_callback, sl, NULL, 0);         
+            viewer_add_menu_item(sl->gv, "Jump to code", menu_callback, sl, NULL, 0);
          }
       }
    }
@@ -316,7 +304,7 @@ static bool pgraph_create(slist_t *sl, int num) {
 
    create_form_name(widget_name, sl, num);
    qsnprintf(node_name, sizeof(node_name), "$ %s", widget_name);
-   
+
    widget = find_widget(widget_name);
 
    netnode id;
@@ -342,7 +330,6 @@ static bool pgraph_create(slist_t *sl, int num) {
 }
 #endif
 
-
 /*------------------------------------------------*/
 /* function : pgraph_display                      */
 /* description: Displays function graph           */
@@ -366,7 +353,6 @@ void pgraph_display(slist_t *sl1, slist_t *sl2) {
       set_dock_pos(buf2, buf, DP_RIGHT);
    }
 }
-
 
 void pgraph_display_one(slist_t *sl) {
    sl->msl = NULL;

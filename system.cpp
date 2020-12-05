@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "precomp.h"
 
 #include "sig.h"
@@ -47,13 +46,12 @@ static int generate_idc_file(char *file) {
    return 0;
 }
 
-
 /*------------------------------------------------*/
 /* function : system_execute_second_instance      */
 /* description: Executes another IDA instance     */
 /*------------------------------------------------*/
 
-static int system_execute_second_instance(char *idc, ea_t ea, char *file, bool close, long id, void *data) {
+static int system_execute_second_instance(char *idc, ea_t ea, const char *file, bool close, long id, void *data) {
    char path[QMAXPATH*4];
    char cmd[QMAXPATH*4];
 
@@ -82,14 +80,13 @@ static int system_execute_second_instance(char *idc, ea_t ea, char *file, bool c
    return os_execute_command(cmd, close, data);
 }
 
-
 /*------------------------------------------------*/
 /* function : ipc_init                            */
 /* description: Inits interprocess communication  */
 /*              between 2 IDA instances           */
 /*------------------------------------------------*/
 
-bool ipc_init(char *file, int type, long id) {
+bool ipc_init(const char *file, int type, long id) {
    bool ret;
    long pid;
    char tmpname[QMAXPATH];
@@ -124,7 +121,6 @@ bool ipc_init(char *file, int type, long id) {
    return true;
 }
 
-
 /*------------------------------------------------*/
 /* function : ipc_close                           */
 /* description: Closes interprocess communication */
@@ -141,7 +137,6 @@ void ipc_close() {
    ipcc.data = NULL;
    ipcc.init = false;
 }
-
 
 /*------------------------------------------------*/
 /* function : ipc_send_cmd                        */
@@ -165,7 +160,6 @@ static bool ipc_send_cmd(char *cmd) {
 
    return true;
 }
-
 
 
 /*------------------------------------------------*/
@@ -199,7 +193,6 @@ bool ipc_recv_cmd(char *buf, size_t blen) {
    return true;
 }
 
-
 /*------------------------------------------------*/
 /* function : ipc_recv_cmd_end                    */
 /* description: Acknowledges end of command       */
@@ -213,14 +206,13 @@ bool ipc_recv_cmd_end() {
    return os_ipc_send(ipcc.data, IPC_CLIENT, &d);
 }
 
-
 /*------------------------------------------------*/
 /* function : ipc_execute_second_instance         */
 /* description: Sends command to the second IDA   */
 /*              instance                          */
 /*------------------------------------------------*/
 
-static void ipc_execute_second_instance(char *idc, ea_t ea, char *file) {
+static void ipc_execute_second_instance(char *idc, ea_t ea, const char *file) {
    char cmd[QMAXPATH*4];
 
    if (!ipc_init(file, 1, 0)) {
@@ -241,32 +233,30 @@ static void ipc_execute_second_instance(char *idc, ea_t ea, char *file) {
    ipc_send_cmd(cmd);
 }
 
-
 /*------------------------------------------------*/
 /* function : system_parse_idb                    */
 /* description: generates a list of signatures for*/
 /*              another idb                       */
 /*------------------------------------------------*/
 
-slist_t *system_parse_idb(ea_t ea, char *file, options_t *opt) {
+slist_t *system_parse_idb(ea_t ea, const char *file, options_t *opt) {
    slist_t *sl = NULL;
    char tmpname[QMAXPATH];
 
    os_tempnam(tmpname, sizeof(tmpname), ".idc");
 
-   if (!options_use_ipc(opt)) {
+   if (!opt->options_use_ipc()) {
       system_execute_second_instance(tmpname, ea, file, true, 0, NULL);
    }
    else {
       ipc_execute_second_instance(tmpname, ea, file);
    }
 
-   sl = siglist_load(tmpname);
+   sl = new slist_t(tmpname);
    os_unlink(tmpname);
 
    return sl;
 }
-
 
 /*------------------------------------------------*/
 /* function : system_get_pref                     */

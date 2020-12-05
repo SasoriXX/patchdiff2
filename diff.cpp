@@ -1,21 +1,20 @@
-/* 
+/*
    Patchdiff2
    Portions (C) 2010 - 2011 Nicolas Pouvesle
    Portions (C) 2007 - 2009 Tenable Network Security, Inc.
-   
+
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License version 2 as 
+   it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #include "precomp.h"
 
@@ -26,7 +25,7 @@
 #include "display.h"
 #include "backup.h"
 #include "options.h"
-
+#include "plugin.h"
 
 /*------------------------------------------------*/
 /* function : diff_init_hash                      */
@@ -36,7 +35,7 @@
 
 static hpsig_t *diff_init_hash(slist_t *sl) {
    fref_t *fref;
-   psig_t *sig;
+   sig_t *sig;
    hpsig_t *h;
    size_t i;
 
@@ -58,7 +57,7 @@ static hpsig_t *diff_init_hash(slist_t *sl) {
             if (!fref->rtype) {
                sig = hash_find_ea(h, fref->ea);
                if (sig) {
-                  sig_add_pref(sig, sl->sigs[i]->startEA, fref->type, DO_NOT_CHECK_REF);
+                  sig->add_pref(sl->sigs[i]->startEA, fref->type, DO_NOT_CHECK_REF);
                }
             }
             fref = fref->next;
@@ -71,7 +70,7 @@ static hpsig_t *diff_init_hash(slist_t *sl) {
             if (!fref->rtype) {
                sig = hash_find_ea(h, fref->ea);
                if (sig) {
-                  sig_add_sref(sig, sl->sigs[i]->startEA, fref->type, DO_NOT_CHECK_REF);
+                  sig->add_sref(sl->sigs[i]->startEA, fref->type, DO_NOT_CHECK_REF);
                }
             }
             fref = fref->next;
@@ -81,7 +80,6 @@ static hpsig_t *diff_init_hash(slist_t *sl) {
    return h;
 }
 
-
 /*------------------------------------------------*/
 /* function : slist_init_crefs                    */
 /* description: Initializes slist crefs           */
@@ -89,81 +87,95 @@ static hpsig_t *diff_init_hash(slist_t *sl) {
 
 static int slist_init_crefs(slist_t *l) {
    hpsig_t *h = NULL;
-   clist_t *cl1, *cl2;
+   clist_t *cl1;
+   clist_t *cl2;
    size_t i;
 
-   h = diff_init_hash(l); 
+   h = diff_init_hash(l);
    if (!h) {
       return -1;
    }
    for (i = 0; i < l->num; i++) {
-      cl1 = clist_init_from_refs(h, sig_get_preds(l->sigs[i]));
-      cl2 = clist_init_from_refs(h, sig_get_succs(l->sigs[i]));
-      sig_set_crefs(l->sigs[i], SIG_PRED, cl1);
-      sig_set_crefs(l->sigs[i], SIG_SUCC, cl2);
+      cl1 = new clist_t(h, l->sigs[i]->get_preds());
+      cl2 = new clist_t(h, l->sigs[i]->get_succs());
+      l->sigs[i]->set_crefs(SIG_PRED, cl1);
+      l->sigs[i]->set_crefs(SIG_SUCC, cl2);
    }
 
    return 0;
 }
 
-
 /*------------------------------------------------*/
-/* function : diff_engine_initialize              */
+/* function : deng_t constructor                  */
 /* description: Initializes engine structures     */
 /*------------------------------------------------*/
+deng_t::deng_t(options_t *opt) {
+   init(opt);
+   magic = 0x0BADF00D;
+}
 
-static deng_t *diff_engine_initialize(slist_t *l1, slist_t *l2, options_t *opt) {
-   deng_t *eng;
+/*------------------------------------------------*/
+/* function : deng_t constructor                  */
+/* description: Initializes engine structures     */
+/*------------------------------------------------*/
+deng_t::deng_t(slist_t *l1, slist_t *l2, options_t *opt) {
+   init(opt);
+
+   unmatched = l1->num + l2->num;
+
+   this->opt = opt;
 
    if (slist_init_crefs(l1) != 0) {
-      return NULL;
+      return;
    }
    if (slist_init_crefs(l2) != 0) {
-      return NULL;
+      return;
    }
 
-   eng = (deng_t *)qalloc(sizeof(*eng));
-   if (!eng) {
-      return NULL;
-   }
-   eng->magic = 0x0BADF00D;
-   eng->wnum = 0;
-
-   eng->identical = 0;
-   eng->matched = 0;
-   eng->unmatched = l1->num + l2->num;
-
-   eng->opt = opt;
-
-   return eng;
+   magic = 0x0BADF00D;
 }
 
-
 /*------------------------------------------------*/
-/* function : diff_engine_initialize              */
+/* function : deng_t constructor                  */
 /* description: Initializes engine structures     */
 /*------------------------------------------------*/
-
-void diff_engine_free(deng_t *eng) {
-   if (eng->ilist) {
-      siglist_free(eng->ilist);
-   }
-   if (eng->mlist) {
-      siglist_free(eng->mlist);
-   }
-   if (eng->ulist) {
-      siglist_free(eng->ulist);
-   }
-   qfree(eng);
+void deng_t::init(options_t *opt) {
+   magic = 0;
+   wnum = 0;
+   opt = opt;
+   mlist = NULL;
+   ulist = NULL;
+   ilist = NULL;
+   identical = 0;
+   matched = 0;
+   unmatched = 0;
 }
 
+/*------------------------------------------------*/
+/* function : deng_t destructor                   */
+/* description: Release engine resources          */
+/*------------------------------------------------*/
+deng_t::~deng_t() {
+   if (ilist) {
+      ilist->free_sigs();
+      delete ilist;
+   }
+   if (mlist) {
+      mlist->free_sigs();
+      delete mlist;
+   }
+   if (ulist) {
+      ulist->free_sigs();
+      delete ulist;
+   }
+}
 
 /*------------------------------------------------*/
 /* function : sig_equal                           */
 /* description: Checks if 2 sigs are equal        */
 /*------------------------------------------------*/
 
-bool sig_equal(psig_t *s1, psig_t *s2, int type) {
+bool sig_equal(sig_t *s1, sig_t *s2, int type) {
    if (s1->sig != s2->sig || s1->hash != s2->hash) {
       return false;
    }
@@ -183,85 +195,17 @@ bool sig_equal(psig_t *s1, psig_t *s2, int type) {
    return true;
 }
 
-
 /*------------------------------------------------*/
 /* function : sig_name_equal                      */
 /* description: Checks if 2 sig names are equal   */
 /*------------------------------------------------*/
 
-static bool sig_name_equal(psig_t *s1, psig_t *s2) {
+static bool sig_name_equal(sig_t *s1, sig_t *s2) {
    if (!strncmp(s1->name.c_str(), "sub_", 4) || (s1->name != s2->name)) {
       return false;
    }
    return true;
 }
-
-/*------------------------------------------------*/
-/* function : clist_equal_match                   */
-/* description: Checks if all the elements of a   */
-/*              clist match                       */
-/*------------------------------------------------*/
-
-static bool clist_equal_match(clist_t *cl1, clist_t *cl2) {
-   dpsig_t *s1, *s2;
-   size_t i;
-
-   if (!cl1 || !cl2 || cl1->nmatch == 0 || cl2->nmatch == 0) {
-      return false;
-   }
-   if (cl1->nmatch != cl2->nmatch) {
-      return false;
-   }
-   s1 = cl1->msigs;
-   s2 = cl2->msigs;
-
-   for (i = 0; i < cl1->nmatch; i++) {
-      if ((sig_get_matched_type(s1->sig) == DIFF_UNMATCHED) || (s1->sig->msig->startEA != s2->sig->startEA)) {
-         return false;
-      }
-      s1 = s1->next;
-      s2 = s2->next;
-   }
-
-   return true;
-}
-
-
-/*------------------------------------------------*/
-/* function : clist_almost_equal_match            */
-/* description: Checks if at lest one element of a*/
-/*              clist match                       */
-/*------------------------------------------------*/
-
-static bool clist_almost_equal_match(clist_t *cl1, clist_t *cl2) {
-   dpsig_t *s1, *s2;
-   size_t i, k;
-
-   if (!cl1 || !cl2 || cl1->nmatch == 0 || cl2->nmatch == 0) {
-      return false;
-   }
-   if (cl1->nmatch != cl2->nmatch) {
-      return false;
-   }
-   s1 = cl1->msigs;
-
-
-   for (i = 0; i < cl1->nmatch; i++) {
-      s2 = cl2->msigs;
-
-      for (k = 0; k < cl2->nmatch; k++) {
-         if (s1->sig->msig->startEA == s2->sig->startEA) {
-            return true;
-         }
-         s2 = s2->next;
-      }
-
-      s1 = s1->next;
-   }
-
-   return false;
-}
-
 
 /*------------------------------------------------*/
 /* function : clist_get_unique_sig                */
@@ -270,7 +214,7 @@ static bool clist_almost_equal_match(clist_t *cl1, clist_t *cl2) {
 /* note: changes ds if ds already matched         */
 /*------------------------------------------------*/
 
-static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
+dpsig_t *clist_t::get_unique_sig(dpsig_t **ds, int type) {
    dpsig_t *ptr, *tmp;
 
    if (!*ds) {
@@ -280,7 +224,7 @@ static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
 
    // do not keep the current signature if not unique
    while (ptr) {
-      if (sig_get_matched_type(ptr->sig) != DIFF_UNMATCHED) {
+      if (ptr->sig->get_matched_type() != DIFF_UNMATCHED) {
          if (ptr == *ds) {
             *ds = ptr->next;
             if (!*ds) {
@@ -289,7 +233,7 @@ static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
          }
 
          tmp = ptr->next;
-         clist_remove(cl, ptr);
+         remove(ptr);
          ptr = tmp;
       }
       else {
@@ -300,7 +244,7 @@ static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
             if (sig_equal(ptr->sig, (*ds)->sig, type) && sig_equal(ptr->next->sig, (*ds)->sig, type)) {
                return NULL;
             }
-            if (( (!sig_equal(ptr->next->sig, (*ds)->sig, type) && (!ptr->prev || !sig_equal(ptr->prev->sig, (*ds)->sig, type))) || !clist_equal_match((*ds)->sig->cs, ptr->next->sig->cs)) && ptr->sig->cs->nmatch > 0 &&  ptr->sig->cs->num == ptr->sig->cs->nmatch) {
+            if (( (!sig_equal(ptr->next->sig, (*ds)->sig, type) && (!ptr->prev || !sig_equal(ptr->prev->sig, (*ds)->sig, type))) || !(*ds)->sig->cs->equal_match(*ptr->next->sig->cs)) && ptr->sig->cs->nmatch > 0 &&  ptr->sig->cs->num == ptr->sig->cs->nmatch) {
                break;
             }
          }
@@ -308,7 +252,7 @@ static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
             if (sig_equal(ptr->sig, (*ds)->sig, type) && sig_equal(ptr->next->sig, (*ds)->sig, type)) {
                return NULL;
             }
-            if (( (!sig_equal(ptr->next->sig, (*ds)->sig, type) && (!ptr->prev || !sig_equal(ptr->prev->sig, (*ds)->sig, type))) || !clist_equal_match((*ds)->sig->cp, ptr->next->sig->cp)) && ptr->sig->cp->nmatch > 0 && ptr->sig->cp->num == ptr->sig->cp->nmatch) {
+            if (( (!sig_equal(ptr->next->sig, (*ds)->sig, type) && (!ptr->prev || !sig_equal(ptr->prev->sig, (*ds)->sig, type))) || !(*ds)->sig->cp->equal_match(*ptr->next->sig->cp)) && ptr->sig->cp->nmatch > 0 && ptr->sig->cp->num == ptr->sig->cp->nmatch) {
                break;
             }
          }
@@ -357,49 +301,48 @@ static dpsig_t *clist_get_unique_sig(clist_t *cl, dpsig_t **ds, int type) {
 /*       next signature in the list               */
 /*------------------------------------------------*/
 
-static dpsig_t *clist_get_best_sig(clist_t *cl, int type) {
-   dpsig_t * best, * ptr;
+dpsig_t *clist_t::get_best_sig(int type) {
+   dpsig_t *best, *ptr;
 
-   best = cl->pos;
+   best = pos;
 
-   ptr = clist_get_unique_sig(cl, &best, type);
+   ptr = get_unique_sig(&best, type);
 
    // no more signature
    if (!best) return NULL;
 
    if (ptr == best) {
-      cl->pos = best->next;
+      pos = best->next;
       return best;
    }
 
-   cl->pos = ptr;
-   return clist_get_best_sig(cl, type);
+   pos = ptr;
+   return get_best_sig(type);
 }
 
-
 /*------------------------------------------------*/
-/* function : clist_get_eq_sig                    */
+/* function : clist_t::get_eq_sig                 */
 /* description: Returns signature if sig presents */
 /*              in list and unique                */
 /*------------------------------------------------*/
 
-static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
+dpsig_t *clist_t::get_eq_sig(dpsig_t *dsig, int type) {
    dpsig_t * ds, * ptr;
-   bool b2, b1 = sig_is_class(dsig->sig);
+   bool b2, b1 = dsig->sig->is_class();
 
-   ds = cl->sigs;
+   ds = sigs;
    while (ds) {
       if (type == DIFF_NEQUAL_SUCC) {
-         ptr = clist_get_unique_sig(cl, &ds, type);
+         ptr = get_unique_sig(&ds, type);
          if (!ds || !ptr) {
             return NULL;
          }
-         b2 = sig_is_class(ptr->sig);
+         b2 = ptr->sig->is_class();
          if (b1 ^ b2) {
             return NULL;
          }
-         if (clist_equal_match(ptr->sig->cs, dsig->sig->cs)) {
-            if (ptr->next && (ptr->next->sig->sig == ptr->sig->sig || clist_equal_match(ptr->next->sig->cs, dsig->sig->cs))) {
+         if (ptr->sig->cs->equal_match(*dsig->sig->cs)) {
+            if (ptr->next && (ptr->next->sig->sig == ptr->sig->sig || ptr->next->sig->cs->equal_match(*dsig->sig->cs))) {
                return NULL;
             }
 
@@ -407,16 +350,16 @@ static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
          }
       }
       else if (type == DIFF_NEQUAL_PRED) {
-         ptr = clist_get_unique_sig(cl, &ds, type);
+         ptr = get_unique_sig(&ds, type);
          if (!ds || !ptr) {
             return NULL;
          }
-         b2 = sig_is_class(ptr->sig);
+         b2 = ptr->sig->is_class();
          if (b1 ^ b2) {
             return NULL;
          }
-         if (clist_equal_match(ptr->sig->cp, dsig->sig->cp)) {
-            if (ptr->next && (ptr->next->sig->sig == ptr->sig->sig || clist_equal_match(ptr->next->sig->cp, dsig->sig->cp))) {
+         if (ptr->sig->cp->equal_match(*dsig->sig->cp)) {
+            if (ptr->next && (ptr->next->sig->sig == ptr->sig->sig || ptr->next->sig->cp->equal_match(*dsig->sig->cp))) {
                return NULL;
             }
 
@@ -424,7 +367,7 @@ static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
          }
       }
       else if (type == DIFF_EQUAL_NAME) {
-         ptr = clist_get_unique_sig(cl, &ds, type);
+         ptr = get_unique_sig(&ds, type);
          if (!ds || !ptr) {
             return NULL;
          }
@@ -433,7 +376,7 @@ static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
          }
       }
       else if (type == DIFF_NEQUAL_STR) {
-         ptr = clist_get_unique_sig(cl, &ds, type);
+         ptr = get_unique_sig(&ds, type);
          if (!ds || !ptr) {
             return NULL;
          }
@@ -443,7 +386,7 @@ static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
       }
       else {
          if (sig_equal(ds->sig, dsig->sig, type)) {
-            ptr = clist_get_unique_sig(cl, &ds, type);
+            ptr = get_unique_sig(&ds, type);
 
             if (!ds) {
                return NULL;
@@ -465,12 +408,14 @@ static dpsig_t *clist_get_eq_sig(clist_t *cl, dpsig_t *dsig, int type) {
    return NULL;
 }
 
-static void clist_update_crefs(clist_t *cl, dpsig_t *ds, int type) {
-   dpsig_t * tmp, * next;
-   dpsig_t * tmp2, * next2;
-   clist_t * tcl;
+void clist_t::update_crefs(dpsig_t *ds, int type) {
+   dpsig_t *tmp;
+   dpsig_t *next;
+   dpsig_t *tmp2;
+   dpsig_t *next2;
+   clist_t *tcl;
 
-   tmp = cl->sigs;
+   tmp = sigs;
    while (tmp) {
       next = tmp->next;
 
@@ -485,7 +430,7 @@ static void clist_update_crefs(clist_t *cl, dpsig_t *ds, int type) {
          next2 = tmp2->next;
 
          if (tmp2->sig->startEA == ds->sig->startEA) {
-            clist_remove(tcl, tmp2);
+            tcl->remove(tmp2);
          }
          tmp2 = next2;
       }
@@ -494,17 +439,15 @@ static void clist_update_crefs(clist_t *cl, dpsig_t *ds, int type) {
    }
 }
 
-
-static void clist_update_and_remove(clist_t *cl, dpsig_t *ds) {
+void clist_t::update_and_remove(dpsig_t *ds) {
    if (ds->removed) {
       return;
    }
-   clist_update_crefs(ds->sig->cp, ds, SIG_SUCC);
-   clist_update_crefs(ds->sig->cs, ds, SIG_PRED);
+   ds->sig->cp->update_crefs(ds, SIG_SUCC);
+   ds->sig->cs->update_crefs(ds, SIG_PRED);
 
-   clist_remove(cl, ds);
+   remove(ds);
 }
-
 
 /*------------------------------------------------*/
 /* function : diff_run                            */
@@ -522,15 +465,15 @@ static int diff_run(deng_t *eng, clist_t *cl1, clist_t *cl2, int min_type, int m
       mtype = DIFF_EQUAL_SIG_HASH;
    }
    do {
-      clist_reset(cl1);
-      clist_reset(cl2);
+      cl1->reset();
+      cl2->reset();
 
       changed = 0;
-      while ((dsig = clist_get_best_sig(cl1, type)) != NULL) {
-         clist_reset(cl2);
-         dsig2 = clist_get_eq_sig(cl2, dsig, type);
-         if (dsig2) {   
-            sig_set_matched_sig(dsig->sig, dsig2->sig, type);
+      while ((dsig = cl1->get_best_sig(type)) != NULL) {
+         cl2->reset();
+         dsig2 = cl2->get_eq_sig(dsig, type);
+         if (dsig2) {
+            dsig->sig->set_matched_sig(dsig2->sig, type);
 
             eng->unmatched -= 2;
             if (dsig->sig->hash2 == dsig2->sig->hash2 || sig_equal(dsig->sig, dsig2->sig, DIFF_EQUAL_SIG_HASH)) {
@@ -541,17 +484,17 @@ static int diff_run(deng_t *eng, clist_t *cl1, clist_t *cl2, int min_type, int m
             }
             changed = 1;
 
-            clist_update_and_remove(cl1, dsig);
-            clist_update_and_remove(cl2, dsig2);
+            cl1->update_and_remove(dsig);
+            cl2->update_and_remove(dsig2);
 
-            b = sig_is_class(dsig->sig);
+            b = dsig->sig->is_class();
 
             // string matching is not 100% reliable so we only match on crc/hash
             if (mtype == DIFF_NEQUAL_STR) {
                b = true;
             }
-            diff_run(eng, sig_get_crefs(dsig->sig, SIG_PRED), sig_get_crefs(dsig2->sig, SIG_PRED), min_type, max_type, b);
-            diff_run(eng, sig_get_crefs(dsig->sig, SIG_SUCC), sig_get_crefs(dsig2->sig, SIG_SUCC), min_type, max_type, b);
+            diff_run(eng, dsig->sig->get_crefs(SIG_PRED), dsig2->sig->get_crefs(SIG_PRED), min_type, max_type, b);
+            diff_run(eng, dsig->sig->get_crefs(SIG_SUCC), dsig2->sig->get_crefs(SIG_SUCC), min_type, max_type, b);
 
          }
       }
@@ -564,24 +507,22 @@ static int diff_run(deng_t *eng, clist_t *cl1, clist_t *cl2, int min_type, int m
    return 0;
 }
 
-
 /*------------------------------------------------*/
 /* function : generate_diff                       */
 /* description: Generates binary diff             */
 /*------------------------------------------------*/
 
-int generate_diff(deng_t **d, slist_t *l1, slist_t *l2, char *file, bool display, options_t *opt) {
+int generate_diff(deng_t **d, slist_t *l1, slist_t *l2, const char *file, options_t *opt) {
    int ret;
    clist_t *cl1, *cl2;
-   int un1, un2, idf, mf;
-   deng_t *eng;
 
-   eng = diff_engine_initialize(l1, l2, opt);
-   if (eng == NULL) {
+   deng_t *eng = new deng_t(l1, l2, opt);
+   if (!eng->is_valid()) {
+      delete eng;
       return -1;
    }
-   cl1 = clist_init(l1);
-   cl2 = clist_init(l2);
+   cl1 = new clist_t(l1);
+   cl2 = new clist_t(l2);
 
    if (file) {
       ret = diff_run(eng, cl1, cl2, DIFF_EQUAL_NAME, DIFF_NEQUAL_STR, false);
@@ -591,59 +532,63 @@ int generate_diff(deng_t **d, slist_t *l1, slist_t *l2, char *file, bool display
       ret = diff_run(eng, cl1, cl2, DIFF_NEQUAL_PRED, DIFF_NEQUAL_STR, false);
    }
 
-   if (display) {
-      eng->mlist = siglist_init(eng->matched, file);
-      eng->ulist = siglist_init(eng->unmatched, file);
-      eng->ilist = siglist_init(eng->identical, file);
-
-      un1 = un2 = idf = mf = 0;
-
-      for (size_t i=0; i<l1->num; i++) {
-         if (sig_is_class(l1->sigs[i])) {
-            sig_free(l1->sigs[i]);
-            continue;
-         }
-
-         if (sig_get_matched_type(l1->sigs[i]) == DIFF_UNMATCHED) {
-            sig_set_nfile(l1->sigs[i], 1);
-            siglist_add(eng->ulist, l1->sigs[i]);
-            un1++;
-         }
-         else {
-            if (l1->sigs[i]->hash2 == l1->sigs[i]->msig->hash2 || sig_equal(l1->sigs[i], l1->sigs[i]->msig, DIFF_EQUAL_SIG_HASH)) {
-               siglist_add(eng->ilist, l1->sigs[i]);
-               idf++;
-            }
-            else {
-               siglist_add(eng->mlist, l1->sigs[i]);
-               mf++;
-            }
-         }
-      }
-
-      for (size_t i = 0; i < l2->num; i++) {
-         if (sig_is_class(l2->sigs[i])) {
-            sig_free(l2->sigs[i]);
-            continue;
-         }
-
-         if (sig_get_matched_type(l2->sigs[i]) == DIFF_UNMATCHED) {
-            sig_set_nfile(l2->sigs[i], 2);
-            siglist_add(eng->ulist, l2->sigs[i]);
-            un2++;
-         }
-      }
-
-      msg("Identical functions:   %d\n", idf);
-      msg("Matched functions:     %d\n", mf);
-      msg("Unmatched functions 1: %d\n", un1);
-      msg("Unmatched functions 2: %d\n", un2);
-      display_results(eng);
-   }
-
    if (d) {
       *d = eng;
+   }
+   else {
+      delete eng;  // what else could be using eng at this point? nothing?
    }
    return 0;
 }
 
+void deng_t::display(pd_plugmod_t *plugin, slist_t *l1, slist_t *l2, const char *file) {
+   int un1, un2, idf, mf;
+
+   mlist = new slist_t(matched, file);
+   ulist = new slist_t(unmatched, file);
+   ilist = new slist_t(identical, file);
+
+   un1 = un2 = idf = mf = 0;
+
+   for (size_t i = 0; i < l1->num; i++) {
+      if (l1->sigs[i]->is_class()) {
+         delete l1->sigs[i];
+         continue;
+      }
+
+      if (l1->sigs[i]->get_matched_type() == DIFF_UNMATCHED) {
+         l1->sigs[i]->set_nfile(1);
+         ulist->add(l1->sigs[i]);
+         un1++;
+      }
+      else {
+         if (l1->sigs[i]->hash2 == l1->sigs[i]->msig->hash2 || sig_equal(l1->sigs[i], l1->sigs[i]->msig, DIFF_EQUAL_SIG_HASH)) {
+            ilist->add(l1->sigs[i]);
+            idf++;
+         }
+         else {
+            mlist->add(l1->sigs[i]);
+            mf++;
+         }
+      }
+   }
+
+   for (size_t i = 0; i < l2->num; i++) {
+      if (l2->sigs[i]->is_class()) {
+         delete l2->sigs[i];
+         continue;
+      }
+
+      if (l2->sigs[i]->get_matched_type() == DIFF_UNMATCHED) {
+         l2->sigs[i]->set_nfile(2);
+         ulist->add(l2->sigs[i]);
+         un2++;
+      }
+   }
+
+   msg("Identical functions:   %d\n", idf);
+   msg("Matched functions:     %d\n", mf);
+   msg("Unmatched functions 1: %d\n", un1);
+   msg("Unmatched functions 2: %d\n", un2);
+   display_results(plugin);
+}

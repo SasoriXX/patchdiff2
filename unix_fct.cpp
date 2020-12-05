@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -30,7 +29,6 @@
 #include "unix_fct.h"
 #include "system.h"
 
-
 struct ipc_data {
    int spipe;
    int rpipe;
@@ -40,7 +38,6 @@ struct ipc_data {
 };
 
 typedef struct ipc_data ipc_data_t;
-
 
 /*------------------------------------------------*/
 /* function : create_process                      */
@@ -66,7 +63,6 @@ pid_t create_process(char *cmd) {
    return pid;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_execute_command                  */
 /* description: Executes a command by creating a  */
@@ -78,7 +74,7 @@ int os_execute_command(char *cmd, bool close, void *data) {
    int ret = -1;
    int status;
    pid_t pid;
- 
+
    pid = create_process(cmd);
    if (pid == -1) {
       return -1;
@@ -92,10 +88,9 @@ int os_execute_command(char *cmd, bool close, void *data) {
    else {
       id->pid = pid;
    }
- 
+
    return 0;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_check_process                    */
@@ -109,7 +104,6 @@ bool os_check_process(pid_t pid) {
    return false;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_copy_to_clipboard                */
 /* description: Copies data to clipboard          */
@@ -117,7 +111,6 @@ bool os_check_process(pid_t pid) {
 
 void os_copy_to_clipboard(char *data) {
 }
-
 
 /*------------------------------------------------*/
 /* function : os_get_pid                          */
@@ -128,7 +121,6 @@ long os_get_pid() {
    return (long)getpid();
 }
 
-
 /*------------------------------------------------*/
 /* function : os_unlink                           */
 /* description: removes a link to a file          */
@@ -137,7 +129,6 @@ long os_get_pid() {
 int os_unlink(const char *path) {
    return unlink(path);
 }
-
 
 /*------------------------------------------------*/
 /* function : os_tempnam                          */
@@ -155,7 +146,6 @@ void os_tempnam(char *data, size_t size, const char *suffix) {
    free(str);
 }
 
-
 /*------------------------------------------------*/
 /* function : os_ipc_send                         */
 /* description: Sends data on pipe                */
@@ -172,7 +162,6 @@ bool os_ipc_send(void *data, int type, idata_t *d) {
    return false;
 }
 
-
 /*------------------------------------------------*/
 /* function : os_ipc_recv                         */
 /* description: Receives data on pipe             */
@@ -183,18 +172,18 @@ bool os_ipc_recv(void *data, int type, idata_t *d) {
    fd_set rfds, efds;
    struct timeval tv;
    int ret;
- 
+
    tv.tv_sec = 0;
    tv.tv_usec = 1000;
- 
+
    if (id->pid) {
       while (1) {
          FD_ZERO(&rfds);
          FD_SET(id->rpipe, &rfds);
-    
+
          FD_ZERO(&efds);
          FD_SET(id->rpipe, &efds);
-    
+
          ret = select(id->rpipe + 1, &rfds, NULL, &efds, &tv);
          if (ret > 0 && FD_ISSET(id->rpipe, &rfds)) {
             break;
@@ -207,21 +196,20 @@ bool os_ipc_recv(void *data, int type, idata_t *d) {
    else {
        FD_ZERO(&rfds);
        FD_SET(id->rpipe, &rfds);
- 
+
        FD_ZERO(&efds);
        FD_SET(id->rpipe, &efds);
- 
+
        ret = select(id->rpipe + 1, &rfds, NULL, &efds, NULL);
        if (!(ret > 0 && FD_ISSET(id->rpipe, &rfds))) {
           return false;
          }
    }
- 
+
    read(id->rpipe, d, sizeof(*d));
- 
+
    return true;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_ipc_init                         */
@@ -232,19 +220,19 @@ bool os_ipc_init(void ** data, long pid, int type) {
    char sname[512];
    char rname[512];
    ipc_data_t *id;
- 
-   id = (ipc_data_t *)qalloc(sizeof(*id));
+
+   id = new ipc_data_t();
    if (!id) {
       return false;
    }
    memset(id, '\0', sizeof(*id));
-    
+
    qsnprintf(sname, sizeof(sname), "/tmp/pdiff2spipe%ld", pid);
    qsnprintf(rname, sizeof(rname), "/tmp/pdiff2rpipe%ld", pid);
- 
+
    id->sname = qstrdup(sname);
    id->rname = qstrdup(rname);
- 
+
    if (type == IPC_SERVER) {
       mkfifo(sname, 0666);
       id->spipe = open(sname, O_RDWR|O_NONBLOCK);
@@ -267,10 +255,10 @@ bool os_ipc_init(void ** data, long pid, int type) {
          goto error;
       }
    }
- 
+
    *data = (void *)id;
    return true;
- 
+
 error:
    if (id->spipe) {
       close(id->spipe);
@@ -278,10 +266,9 @@ error:
    if (id->rpipe) {
       close(id->rpipe);
    }
-   qfree(id);
+   delete id;
    return false;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_ipc_close                        */
@@ -301,7 +288,6 @@ bool os_ipc_close(void *data) {
    os_unlink(id->rname);
    return true;
 }
-
 
 /*------------------------------------------------*/
 /* function : os_get_pref_int                     */

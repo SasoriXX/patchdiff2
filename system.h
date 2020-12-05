@@ -51,9 +51,9 @@ typedef struct idata idata_t;
 
 
 bool system_get_pref(const char *, void *, int);
-slist_t * system_parse_idb(ea_t, char *, options_t *);
+slist_t *system_parse_idb(ea_t, const char *, options_t *);
 
-bool ipc_init(char *, int, long);
+bool ipc_init(const char *, int, long);
 void ipc_close();
 bool ipc_recv_cmd(char *, size_t);
 bool ipc_recv_cmd_end();
