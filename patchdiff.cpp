@@ -34,6 +34,14 @@ extern char *exename;
 
 cpu_t patchdiff_cpu;
 
+int get_proc_id() {
+#if IDA_SDK_VERSION < 750
+   return ph.id;
+#else
+   return PH.id;
+#endif
+}
+
 void pd_plugmod_t::term(void) {
    unhook_from_notification_point(HT_UI, ui_callback);
 
@@ -52,6 +60,7 @@ void pd_plugmod_t::term(void) {
 int pd_plugmod_t::init() {
    char procname[256];
    bool is64;
+   int proc_id;
 #if IDA_SDK_VERSION < 730
    qstrncpy(procname, inf.procname, sizeof(procname));
    is64 = inf.is_64bit();
@@ -59,7 +68,8 @@ int pd_plugmod_t::init() {
    inf_get_procname(procname, sizeof(procname));
    is64 = inf_is_64bit();
 #endif
-   if (!strcmp(procname, "metapc")) {
+   proc_id = get_proc_id();
+   if (proc_id == PLFM_386) {
       if (is64) {
          patchdiff_cpu = CPU_X8664;
       }
@@ -67,8 +77,24 @@ int pd_plugmod_t::init() {
          patchdiff_cpu = CPU_X8632;
       }
    }
-   else if (!strcmp(procname, "PPC")) {
+   else if (proc_id = PLFM_PPC) {
       patchdiff_cpu = CPU_PPC;
+   }
+   else if (proc_id = PLFM_ARM) {
+      if (is64) {
+         patchdiff_cpu = CPU_AARCH64;
+      }
+      else {
+         patchdiff_cpu = CPU_ARM;
+      }
+   }
+   else if (proc_id = PLFM_MIPS) {
+      if (is64) {
+         patchdiff_cpu = CPU_MIPS64;
+      }
+      else {
+         patchdiff_cpu = CPU_MIPS;
+      }
    }
    else {
       patchdiff_cpu = CPU_DEFAULT;

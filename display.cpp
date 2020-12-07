@@ -327,7 +327,16 @@ static uint32 idaapi res_unmatch(deng_t *d, uint32 n, int type) {
 
    sl->remove(n - 1);
 
+   // added entries to the unmatched list
    refresh_chooser(title_unmatch);
+
+   // removed an entry from one of the following lists
+   if (type == 0) {
+      refresh_chooser(title_identical);
+   }
+   else {
+      refresh_chooser(title_match);
+   }
 
    return 1;
 }
@@ -414,9 +423,10 @@ void propagate_match(deng_t *eng, sig_t *s1, sig_t *s2, int options) {
 /*              list                              */
 /*------------------------------------------------*/
 
-static uint32 idaapi res_match(void *obj,uint32 n) {
+static uint32 idaapi res_match(void *obj, uint32 n) {
    deng_t *eng = (deng_t *)obj;
-   sig_t *s1, *s2;
+   sig_t *s1;
+   sig_t *s2;
    int option;
    ea_t ea = BADADDR;
    size_t i;
@@ -444,8 +454,10 @@ static uint32 idaapi res_match(void *obj,uint32 n) {
          s1->set_matched_sig(s2, DIFF_MANUAL);
          propagate_match(eng, s1, s2, option);
 
+         // adding a match
          refresh_chooser(title_match);
-         refresh_chooser(title_identical);
+         // removing a pair of unmatched functions
+         refresh_chooser(title_unmatch);
 
          return 1;
       }
@@ -472,7 +484,10 @@ static uint32 idaapi res_mtoi(void *obj, uint32 n) {
    d->ilist->add(sig);
    d->mlist->remove(n - 1);
 
+   // adding to identical
    refresh_chooser(title_identical);
+   // removing from matched
+   refresh_chooser(title_match);
 
    return 1;
 }
@@ -492,6 +507,9 @@ static uint32 idaapi res_itom(void *obj, uint32 n) {
    d->mlist->add(sig);
    d->ilist->remove(n - 1);
 
+   // removing from identical
+   refresh_chooser(title_identical);
+   // adding to matched
    refresh_chooser(title_match);
 
    return 1;
@@ -507,6 +525,7 @@ static uint32 idaapi res_flagged(void *obj, uint32 n) {
 
    sig->flag = !sig->flag;
 
+   // flagging only happens on the matched list
    refresh_chooser(title_match);
 
    return 1;
